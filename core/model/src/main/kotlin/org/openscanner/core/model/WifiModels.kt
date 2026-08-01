@@ -71,9 +71,12 @@ data class AccessPointObservation(
     val generation: WifiGeneration,
     val timestampMicros: Long,
     val isConnected: Boolean,
+    /** True only when Android supplied no SSID; never inferred from the display text. */
+    val ssidHidden: Boolean = false,
 ) {
     override fun toString(): String =
         "AccessPointObservation(id=<redacted>, ssid=<redacted>, bssid=<redacted>, " +
+            "ssidHidden=$ssidHidden, " +
             "channel=$channel, channelWidthMhz=$channelWidthMhz, " +
             "footprintCenterFrequencyMhz=$footprintCenterFrequencyMhz, rssiDbm=$rssiDbm, " +
             "security=$security, generation=$generation, timestampMicros=$timestampMicros, " +

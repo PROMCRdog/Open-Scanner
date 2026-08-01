@@ -74,14 +74,11 @@ fun ScanScreen(
 ) {
     var searchVisible by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val visible = state.networks
-        .asSequence()
-        .filter { it.channelGroup == state.selectedChannelGroup }
-        .filter {
-            query.isBlank() || it.name.contains(query, ignoreCase = true) ||
-                it.bssid.orEmpty().contains(query, ignoreCase = true)
-        }
-        .toList()
+    val visible = mutableListOf<NetworkUiModel>()
+    for (network in state.networks) {
+        if (network.channelGroup != state.selectedChannelGroup) continue
+        if (networkMatchesSearch(query, network.displayName(), network.bssid)) visible += network
+    }
     val accessPointCountNoun = stringResource(
         if (visible.size == 1) R.string.scan_access_point else R.string.scan_access_points,
     )
@@ -197,6 +194,10 @@ fun ScanScreen(
         )
     }
 }
+
+internal fun networkMatchesSearch(query: String, displayName: String, bssid: String?): Boolean =
+    query.isBlank() || displayName.contains(query, ignoreCase = true) ||
+        bssid.orEmpty().contains(query, ignoreCase = true)
 
 @Composable
 private fun ToolbarButton(icon: ImageVector, description: String, onClick: () -> Unit) {

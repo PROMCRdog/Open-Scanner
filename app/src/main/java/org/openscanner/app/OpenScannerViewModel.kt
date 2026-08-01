@@ -33,7 +33,6 @@ import org.openscanner.core.export.WifiLogRecorder
 import org.openscanner.core.export.WifiLogSession
 import org.openscanner.core.model.AccessPointObservation
 import org.openscanner.core.model.AppPreferences
-import org.openscanner.core.model.HIDDEN_NETWORK_SSID
 import org.openscanner.core.model.ScannerState
 import org.openscanner.core.model.SignalSample
 import org.openscanner.core.model.UNAVAILABLE_BSSID
@@ -529,12 +528,8 @@ class OpenScannerViewModel(
         return NetworkUiModel(
             uiId = opaqueId(id),
             name = displayed.ssid,
-            bssid = displayed.bssid.takeUnless { bssid == UNAVAILABLE_BSSID },
-            nameKind = when {
-                privacyMode -> NetworkNameKind.PRIVACY_ALIAS
-                ssid == HIDDEN_NETWORK_SSID -> NetworkNameKind.HIDDEN
-                else -> NetworkNameKind.OBSERVED
-            },
+            bssid = displayed.bssid.takeUnless { this.bssid == UNAVAILABLE_BSSID },
+            nameKind = networkNameKind(privacyMode, ssidHidden),
             privacyAliasNumber = aliasNumber.takeIf { privacyMode },
             band = channel.band,
             channelGroup = WifiChannelMapper.group(channel),
@@ -565,4 +560,10 @@ class OpenScannerViewModel(
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             OpenScannerViewModel(wifiRepository, settingsRepository) as T
     }
+}
+
+internal fun networkNameKind(privacyMode: Boolean, ssidHidden: Boolean): NetworkNameKind = when {
+    privacyMode -> NetworkNameKind.PRIVACY_ALIAS
+    ssidHidden -> NetworkNameKind.HIDDEN
+    else -> NetworkNameKind.OBSERVED
 }

@@ -646,6 +646,7 @@ class AndroidWifiScanRepository(
         return AccessPointObservation(
             id = normalizedBssid.ifBlank { "unknown-${frequency}-${timestamp}" },
             ssid = SSID.takeUnless { it.isNullOrBlank() } ?: HIDDEN_NETWORK_SSID,
+            ssidHidden = SSID.isNullOrBlank(),
             bssid = normalizedBssid.ifBlank { UNAVAILABLE_BSSID },
             channel = WifiChannelMapper.fromFrequency(frequency),
             channelWidthMhz = mapPlatformChannelWidth(channelWidth),
