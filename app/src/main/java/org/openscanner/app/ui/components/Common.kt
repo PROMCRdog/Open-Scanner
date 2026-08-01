@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -152,6 +153,7 @@ fun ChannelGroupSelector(
 ) {
     val listState = rememberLazyListState()
     val selectedIndex = groups.indexOfFirst { it.group == selectedGroup }
+    val selectorShape = MaterialTheme.shapes.small
     LaunchedEffect(selectedIndex) {
         if (selectedIndex >= 0) listState.scrollToItem(selectedIndex)
     }
@@ -160,7 +162,8 @@ fun ChannelGroupSelector(
         modifier = modifier
             .fillMaxWidth()
             .height(ScannerSpacing.MinTouchTarget)
-            .border(1.dp, ScannerBorder, MaterialTheme.shapes.small),
+            .border(1.dp, ScannerBorder, selectorShape)
+            .clip(selectorShape),
     ) {
         itemsIndexed(groups, key = { _, option -> option.group }) { index, option ->
             val selected = option.group == selectedGroup

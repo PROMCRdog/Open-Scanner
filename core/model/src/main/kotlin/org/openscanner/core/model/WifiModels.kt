@@ -99,6 +99,8 @@ data class PlatformCapabilities(
     val hasWifiHardware: Boolean,
     val supports5Ghz: Boolean,
     val supports6Ghz: Boolean,
+    /** Persisted Developer Options state when Android exposes it; null on older/unsupported devices. */
+    val wifiScanThrottleEnabled: Boolean? = null,
 )
 
 data class ScanSnapshot(

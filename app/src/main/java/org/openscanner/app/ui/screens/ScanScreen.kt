@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -53,6 +54,7 @@ import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
 import org.openscanner.app.ui.theme.ScannerIconWell
 import org.openscanner.app.ui.theme.ScannerMuted
+import org.openscanner.app.ui.theme.ScannerOnCyan
 import org.openscanner.app.ui.theme.ScannerSpacing
 import org.openscanner.app.ui.theme.ScannerSurface
 import org.openscanner.app.ui.theme.ScannerText
@@ -202,22 +204,41 @@ private fun ToolbarButton(icon: ImageVector, description: String, onClick: () ->
 }
 
 @Composable
-private fun StateBadge(text: String, modifier: Modifier = Modifier) {
+private fun StateBadge(
+    text: String,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+) {
+    val shape = MaterialTheme.shapes.extraSmall
     Box(
         modifier = modifier
-            .border(1.dp, ScannerCyan, MaterialTheme.shapes.extraSmall)
+            .background(if (emphasized) ScannerCyan else Color.Transparent, shape)
+            .border(1.dp, ScannerCyan, shape)
             .padding(horizontal = ScannerSpacing.Sm, vertical = ScannerSpacing.Xs),
     ) {
-        Text(text, color = ScannerCyan, style = MaterialTheme.typography.labelMedium)
+        Text(
+            text,
+            color = if (emphasized) ScannerOnCyan else ScannerCyan,
+            style = MaterialTheme.typography.labelMedium,
+        )
     }
 }
 
 @Composable
 private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
+    val rowShape = MaterialTheme.shapes.small
+    val connectionHighlight = if (network.connected) {
+        Modifier
+            .background(ScannerIconWell, rowShape)
+            .border(1.dp, ScannerCyan, rowShape)
+    } else {
+        Modifier
+    }
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(connectionHighlight)
                 .clickable(role = Role.Button, onClick = onClick)
                 .semantics {
                     role = Role.Button
@@ -225,7 +246,7 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
                         append("${network.name}, ${network.signalDbm} dBm, ${network.channelGroup.label}")
                         network.channel?.let { append(", channel $it") }
                         append(", ${network.security}")
-                        if (network.connected) append(", connected")
+                        if (network.connected) append(", current system Wi-Fi connection")
                         if (network.selected) append(", selected for tracking")
                     }
                 }
@@ -235,34 +256,34 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
         ) {
             SignalGlyph(network.signalDbm)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
+                Text(
+                    network.name,
+                    color = ScannerText,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm),
                 ) {
+                    if (network.connected) {
+                        StateBadge("CURRENT WI-FI", emphasized = true)
+                    }
                     Text(
-                        network.name,
-                        color = ScannerText,
-                        style = MaterialTheme.typography.titleMedium,
+                        buildString {
+                            append(network.channelGroup.label)
+                            network.channel?.let { append(" · Ch $it") }
+                            network.channelWidthMhz?.let { append(" · ${it} MHz") }
+                            append(" · ${network.security}")
+                        },
+                        color = ScannerMuted,
+                        style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.weight(1f),
                     )
-                    if (network.connected) {
-                        StateBadge("CONNECTED")
-                    }
                 }
-                Text(
-                    buildString {
-                        append(network.channelGroup.label)
-                        network.channel?.let { append(" · Ch $it") }
-                        network.channelWidthMhz?.let { append(" · ${it} MHz") }
-                        append(" · ${network.security}")
-                    },
-                    color = ScannerMuted,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
             Column(
                 horizontalAlignment = Alignment.End,

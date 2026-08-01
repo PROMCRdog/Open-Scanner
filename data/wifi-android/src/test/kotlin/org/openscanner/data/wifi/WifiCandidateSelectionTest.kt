@@ -27,4 +27,22 @@ class WifiCandidateSelectionTest {
             ),
         )
     }
+
+    @Test
+    fun fallsBackToPermissionGatedIdentifiersWhenTransportInfoIsRedacted() {
+        assertEquals(
+            "aa:bb:cc:dd:ee:ff",
+            selectConnectionBssid(
+                transportBssid = "02:00:00:00:00:00",
+                legacyBssid = "AA:BB:CC:DD:EE:FF",
+            ),
+        )
+        assertEquals(
+            "Office Wi-Fi",
+            selectConnectionSsid(
+                transportSsid = "<unknown ssid>",
+                legacySsid = "\"Office Wi-Fi\"",
+            ),
+        )
+    }
 }

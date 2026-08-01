@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.junit.Assert.assertTrue
@@ -56,6 +57,42 @@ class OpenScannerAppTest {
         composeRule.onNodeWithText("Channel spectrum").assertIsDisplayed()
         composeRule.onNodeWithText("Scan").performClick()
         composeRule.onNodeWithText("Nearby networks").assertIsDisplayed()
+    }
+
+    @Test
+    fun scanHighlightsCurrentSystemWifi() {
+        composeRule.setContent {
+            OpenScannerTheme {
+                OpenScannerApp(
+                    state = liveState().copy(activeTab = AppTab.SCAN),
+                    onTabSelected = {},
+                    onChannelGroupSelected = {},
+                    onSelectNetwork = { _, _ -> },
+                    onRefresh = {},
+                    onPauseChanged = {},
+                    onPrivacyChanged = {},
+                    onRefreshIntervalChanged = {},
+                    onResetSettings = {},
+                    onRequestPermission = {},
+                    onOpenWifiSettings = {},
+                    onOpenLocationSettings = {},
+                    onLogFieldChanged = { _, _ -> },
+                    onSetAllLogFields = {},
+                    onStartLogging = {},
+                    onStopLogging = {},
+                    onClearLog = {},
+                    buildSnapshotExport = { null },
+                    buildLogExport = { null },
+                    shareExport = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("CURRENT WI-FI").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            "Sample network, -52 dBm, 5.2 GHz, channel 36, WPA3 Personal, " +
+                "current system Wi-Fi connection, selected for tracking",
+        ).assertIsDisplayed()
     }
 
     @Test
@@ -199,6 +236,57 @@ class OpenScannerAppTest {
         composeRule.onNodeWithText("Logging fields").assertIsDisplayed()
         composeRule.onNodeWithText("Clear all").performClick()
         assertTrue(clearAllRequested)
+    }
+
+    @Test
+    fun settingsReflectsWifiScanThrottleStateAndShowsDisableHint() {
+        val initialState = liveState()
+        var state by mutableStateOf(
+            initialState.copy(
+                activeTab = AppTab.SETTINGS,
+                capabilities = initialState.capabilities.copy(wifiScanThrottleEnabled = true),
+            ),
+        )
+        composeRule.setContent {
+            OpenScannerTheme {
+                OpenScannerApp(
+                    state = state,
+                    onTabSelected = {},
+                    onChannelGroupSelected = {},
+                    onSelectNetwork = { _, _ -> },
+                    onRefresh = {},
+                    onPauseChanged = {},
+                    onPrivacyChanged = {},
+                    onRefreshIntervalChanged = {},
+                    onResetSettings = {},
+                    onRequestPermission = {},
+                    onOpenWifiSettings = {},
+                    onOpenLocationSettings = {},
+                    onLogFieldChanged = { _, _ -> },
+                    onSetAllLogFields = {},
+                    onStartLogging = {},
+                    onStopLogging = {},
+                    onClearLog = {},
+                    buildSnapshotExport = { null },
+                    buildLogExport = { null },
+                    shareExport = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(
+            "Wi-Fi scan throttling: ON. Disable for local testing: Developer options › Networking › " +
+                "Wi-Fi scan throttling. May increase battery use.",
+        ).assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            state = state.copy(
+                capabilities = state.capabilities.copy(wifiScanThrottleEnabled = false),
+            )
+        }
+        composeRule.onNodeWithContentDescription(
+            "Wi-Fi scan throttling: OFF. Disabled in Developer options; Android may scan more often and use more battery.",
+        ).assertIsDisplayed()
     }
 
     private fun liveState(): OpenScannerUiState = OpenScannerUiState(

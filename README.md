@@ -12,8 +12,8 @@ The interface follows the selected dark **Field Console** direction. It prioriti
 
 - One application-scoped scan coordinator; screens never create competing scan loops.
 - Nearby access-point inventory with channel-validated 2.4, 5.2, 5.5/DFS, 5.8, 6 GHz, and unsupported-frequency groups.
-- SSID, BSSID, signal, channel, frequency, width, security, Wi-Fi generation, and connected-state evidence when Android exposes them.
-- Search, strength-first sorting, explicit refresh, cached/throttled-result warning, and distinct permission/Wi-Fi/Location/device error states.
+- SSID, BSSID, signal, channel, frequency, width, security, Wi-Fi generation, and a highlighted current-system Wi-Fi marker when Android exposes connection evidence.
+- Search, strength-first sorting, explicit refresh, cached/throttled-result warning, read-only Android scan-throttle status, and distinct permission/Wi-Fi/Location/device error states.
 - A selected-AP tracker with a timestamp-scaled, bounded 60-sample, memory-only signal history and a visible gap when the latest evidence is no longer current.
 - A recent-snapshot stability indicator that reports RSSI range and observed absence share instead of requiring users to infer flapping from the graph.
 - A dedicated Canvas spectrum graph showing up to four emphasized networks and an accessible text equivalent; unknown channel widths stay visibly unknown instead of becoming invented 20 MHz footprints.

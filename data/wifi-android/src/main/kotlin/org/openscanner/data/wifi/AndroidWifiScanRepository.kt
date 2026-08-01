@@ -16,6 +16,7 @@ import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.SystemClock
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
@@ -204,7 +205,33 @@ class AndroidWifiScanRepository(
             supports5Ghz = hasWifi && runCatching { wifiManager?.is5GHzBandSupported == true }.getOrDefault(false),
             supports6Ghz = hasWifi && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
                 runCatching { wifiManager?.is6GHzBandSupported == true }.getOrDefault(false),
+            wifiScanThrottleEnabled = if (hasWifi) readWifiScanThrottleEnabled() else null,
         )
+    }
+
+    /**
+     * Reads the persisted switch shown by Android's Developer Options UI.
+     *
+     * Android 11 added the public WifiManager query. Android 10 already had
+     * the switch, but exposed its readable Settings.Global key only as a
+     * hidden constant, so that one release uses the stable AOSP key directly.
+     */
+    @SuppressLint("MissingPermission")
+    private fun readWifiScanThrottleEnabled(): Boolean? {
+        val manager = wifiManager ?: return null
+        return when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
+                runCatching { manager.isScanThrottleEnabled }.getOrNull()
+            Build.VERSION.SDK_INT == Build.VERSION_CODES.Q ->
+                runCatching {
+                    Settings.Global.getInt(
+                        appContext.contentResolver,
+                        WIFI_SCAN_THROTTLE_ENABLED_SETTING,
+                        1,
+                    ) != 0
+                }.getOrNull()
+            else -> null
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -359,10 +386,17 @@ class AndroidWifiScanRepository(
         } else {
             legacyWifiInfo
         }
-        val bssid = normalizeWifiBssid(wifiInfo?.bssid)
-        val ssid = wifiInfo?.ssid
-            ?.removeSurrounding("\"")
-            ?.takeUnless { it == WifiManager.UNKNOWN_SSID }
+        // Synchronous NetworkCapabilities intentionally redacts location-sensitive
+        // WifiInfo fields. Prefer it for connection metrics, but recover identifiers
+        // from the permission-gated legacy result when those fields are redacted.
+        val bssid = selectConnectionBssid(
+            transportBssid = wifiInfo?.bssid,
+            legacyBssid = reportedPrimaryBssid,
+        )
+        val ssid = selectConnectionSsid(
+            transportSsid = wifiInfo?.ssid,
+            legacySsid = legacyWifiInfo?.ssid,
+        )
         val defaultGateway = linkProperties?.routes
             ?.firstOrNull { it.isDefaultRoute }
             ?.gateway
@@ -529,3 +563,19 @@ internal fun choosePhysicalWifiCandidateIndex(
 internal fun normalizeWifiBssid(value: String?): String? = value
     ?.lowercase()
     ?.takeUnless { it == "02:00:00:00:00:00" || it.isBlank() }
+
+internal fun selectConnectionBssid(
+    transportBssid: String?,
+    legacyBssid: String?,
+): String? = normalizeWifiBssid(transportBssid) ?: normalizeWifiBssid(legacyBssid)
+
+internal fun selectConnectionSsid(
+    transportSsid: String?,
+    legacySsid: String?,
+): String? = normalizeWifiSsid(transportSsid) ?: normalizeWifiSsid(legacySsid)
+
+private fun normalizeWifiSsid(value: String?): String? = value
+    ?.removeSurrounding("\"")
+    ?.takeUnless { it == WifiManager.UNKNOWN_SSID || it.isBlank() }
+
+private const val WIFI_SCAN_THROTTLE_ENABLED_SETTING = "wifi_scan_throttle_enabled"

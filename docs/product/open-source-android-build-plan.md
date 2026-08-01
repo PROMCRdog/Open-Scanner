@@ -127,7 +127,7 @@ Changing screens never restarts scanning or clears pause; changing band filters 
 - On API 37+, LAN tools remain unavailable because broad local access is outside v0.1.0; a later target-37 module must add runtime `ACCESS_LOCAL_NETWORK` only at point of use.
 - Use a versioned `PlatformCapabilities` adapter for API 26–28, 29–32, 33–36, and 37+ behavior.
 - Treat every API field, WiFi generation, width, security type, MLO link, IP, DNS, and link speed as optional.
-- Never direct ordinary users to disable scan throttling; developer override instructions belong only in contributor test docs.
+- Expose scan throttling as a read-only Android setting, distinct from observed cached-result evidence. A Settings hint may point to the Developer Options override for local testing, but must state that disabling it can increase scan frequency and battery use and must not present it as the default operating mode.
 - Stop scan requests when the process is not foreground-visible; explicit future sessions require a separate foreground-service design review.
 
 ## 8. Kotlin and Jetpack Compose stack

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.openscanner.app.OpenScannerUiState
 import org.openscanner.app.ui.components.AppHeader
+import org.openscanner.app.ui.theme.ScannerAmber
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
 import org.openscanner.app.ui.theme.ScannerIconWell
@@ -105,6 +107,7 @@ fun SettingsScreen(
             detail = "Joining networks and passwords stay in the system UI",
             onClick = onOpenWifiSettings,
         )
+        WifiScanThrottleStatusRow(state.capabilities.wifiScanThrottleEnabled)
         SettingsRow(
             icon = Icons.Rounded.Schedule,
             label = "Refresh request interval",
@@ -286,6 +289,51 @@ private fun ToggleRow(
             enabled = enabled,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(checkedTrackColor = ScannerCyan),
+        )
+    }
+    HorizontalDivider(color = ScannerBorder)
+}
+
+@Composable
+private fun WifiScanThrottleStatusRow(enabled: Boolean?) {
+    val status = when (enabled) {
+        true -> "ON"
+        false -> "OFF"
+        null -> "N/A"
+    }
+    val statusColor = when (enabled) {
+        true -> ScannerAmber
+        false -> ScannerCyan
+        null -> ScannerMuted
+    }
+    val detail = when (enabled) {
+        true -> "Disable for local testing: Developer options › Networking › Wi-Fi scan throttling. May increase battery use."
+        false -> "Disabled in Developer options; Android may scan more often and use more battery."
+        null -> "Status unavailable. On Android 10+, check Developer options › Networking › Wi-Fi scan throttling."
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = ScannerSpacing.MinTouchTarget + 30.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Wi-Fi scan throttling: $status. $detail"
+            }
+            .padding(horizontal = ScannerSpacing.Sm, vertical = ScannerSpacing.Md - 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ScannerSpacing.Md),
+    ) {
+        SettingIcon(Icons.Rounded.Speed)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
+            Text("Wi-Fi scan throttling", color = ScannerText, style = MaterialTheme.typography.titleMedium)
+            Text(detail, color = ScannerMuted, style = MaterialTheme.typography.labelSmall)
+        }
+        Text(
+            status,
+            color = statusColor,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier
+                .border(1.dp, statusColor, MaterialTheme.shapes.small)
+                .padding(horizontal = ScannerSpacing.Sm, vertical = ScannerSpacing.Xs),
         )
     }
     HorizontalDivider(color = ScannerBorder)
