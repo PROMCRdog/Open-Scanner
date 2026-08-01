@@ -19,7 +19,7 @@ import org.openscanner.core.model.WifiGeneration
 class WifiLogExporterTest {
     @Test
     fun recorderRedactsBeforeCreatingRecordsAndKeepsAliasesStable() {
-        val recorder = RedactedWifiLogRecorder(
+        val recorder = WifiLogRecorder(
             selectedFields = WifiLogField.entries.toSet(),
             startedAtEpochMs = 120_999L,
             startedAtElapsedMs = 1_000L,
@@ -32,7 +32,8 @@ class WifiLogExporterTest {
         recorder.stop(5_000L)
 
         val session = recorder.snapshot()
-        assertEquals(120_000L, session.startedAtEpochMinuteMs)
+        assertEquals(120_000L, session.startedAtEpochMs)
+        assertTrue(session.redacted)
         assertEquals(3, session.records.size)
         assertEquals("Network 1", session.records[0].networkValues[0][WifiLogField.NETWORK_NAME])
         assertEquals("Network 1", session.records[2].networkValues[0][WifiLogField.NETWORK_NAME])
@@ -44,7 +45,7 @@ class WifiLogExporterTest {
 
     @Test
     fun onlySelectedFieldsAreRetainedAndUnavailableValuesStayExplicit() {
-        val recorder = RedactedWifiLogRecorder(
+        val recorder = WifiLogRecorder(
             selectedFields = setOf(WifiLogField.RSSI_DBM, WifiLogField.CHANNEL_WIDTH_MHZ),
             startedAtEpochMs = 0L,
             startedAtElapsedMs = 0L,
@@ -60,7 +61,7 @@ class WifiLogExporterTest {
 
     @Test
     fun omitsNetworkRowsWhenNoAccessPointFieldWasSelected() {
-        val recorder = RedactedWifiLogRecorder(
+        val recorder = WifiLogRecorder(
             selectedFields = setOf(WifiLogField.SCANNER_STATE),
             startedAtEpochMs = 0L,
             startedAtElapsedMs = 0L,
@@ -74,12 +75,12 @@ class WifiLogExporterTest {
 
     @Test
     fun stopsCleanlyAtTheRecordSafetyLimit() {
-        val recorder = RedactedWifiLogRecorder(
+        val recorder = WifiLogRecorder(
             selectedFields = setOf(WifiLogField.SCANNER_STATE),
             startedAtEpochMs = 0L,
             startedAtElapsedMs = 0L,
         )
-        repeat(RedactedWifiLogRecorder.MAX_RECORDS) { index ->
+        repeat(WifiLogRecorder.MAX_RECORDS) { index ->
             assertEquals(
                 WifiLogRecordResult.ADDED,
                 recorder.record(state(sequence = 1), index.toLong(), force = true),
@@ -95,7 +96,7 @@ class WifiLogExporterTest {
 
     @Test
     fun everyLogFormatIsStructuredAndContainsNoRawIdentifierOrAddress() {
-        val recorder = RedactedWifiLogRecorder(
+        val recorder = WifiLogRecorder(
             selectedFields = WifiLogField.entries.toSet(),
             startedAtEpochMs = 120_999L,
             startedAtElapsedMs = 1_000L,
@@ -115,7 +116,7 @@ class WifiLogExporterTest {
 
     @Test
     fun jsonUsesNumbersBooleansAndNullsInsteadOfStringifyingEverything() {
-        val recorder = RedactedWifiLogRecorder(
+        val recorder = WifiLogRecorder(
             selectedFields = setOf(
                 WifiLogField.SNAPSHOT_SEQUENCE,
                 WifiLogField.RSSI_DBM,
@@ -133,6 +134,37 @@ class WifiLogExporterTest {
         assertTrue("\"rssi_dbm\": -48" in json)
         assertTrue("\"channel_width_mhz\": null" in json)
         assertTrue("\"connected_ap\": true" in json)
+    }
+
+    @Test
+    fun explicitUnredactedSessionRetainsRawValuesAndLabelsEveryFormat() {
+        val recorder = WifiLogRecorder(
+            selectedFields = WifiLogField.entries.toSet(),
+            startedAtEpochMs = 120_999L,
+            startedAtElapsedMs = 1_000L,
+            redacted = false,
+        )
+        recorder.record(state(sequence = 1), 2_000L)
+        recorder.stop(3_000L)
+
+        val session = recorder.snapshot()
+        assertFalse(session.redacted)
+        assertEquals(120_999L, session.startedAtEpochMs)
+        assertEquals("Secret Lab", session.records.single().networkValues.single()[WifiLogField.NETWORK_NAME])
+        assertEquals("aa:bb:cc:dd:ee:ff", session.records.single().networkValues.single()[WifiLogField.BSSID])
+        assertEquals("192.168.1.20", session.records.single().connectionValues[WifiLogField.IP_ADDRESS])
+
+        WifiLogFormat.entries.forEach { format ->
+            val document = WifiLogExporter.export(session, format)
+            assertFalse(document.redacted)
+            assertTrue("Secret Lab" in document.content)
+            assertTrue("aa:bb:cc:dd:ee:ff" in document.content)
+            assertTrue("192.168.1.20" in document.content)
+            assertTrue("unredacted" in document.fileName)
+        }
+        val json = WifiLogExporter.export(session, WifiLogFormat.JSON).content
+        assertTrue("\"redacted\": false" in json)
+        assertTrue("1970-01-01T00:02:00.999Z" in json)
     }
 
     private fun state(sequence: Long): ScannerState = ScannerState(

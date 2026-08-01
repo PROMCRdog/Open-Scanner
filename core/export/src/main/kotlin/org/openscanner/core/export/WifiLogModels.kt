@@ -69,13 +69,13 @@ enum class WifiLogField(
     NETWORK_NAME(
         "network_name",
         "Network name",
-        "Stable session alias; raw SSIDs are never logged",
+        "SSID, or a stable session alias when report redaction is enabled",
         WifiLogFieldCategory.NETWORK,
     ),
     BSSID(
-        "bssid_alias",
-        "BSSID alias",
-        "Stable session token; raw BSSIDs are never logged",
+        "bssid",
+        "BSSID",
+        "Hardware address, or a stable session token when report redaction is enabled",
         WifiLogFieldCategory.NETWORK,
     ),
     CHANNEL_GROUP(
@@ -167,13 +167,13 @@ enum class WifiLogField(
     CONNECTION_NETWORK(
         "connection_network",
         "Connected network",
-        "Stable session alias when it matches an observed BSSID",
+        "SSID, or a stable session alias when report redaction is enabled",
         WifiLogFieldCategory.CONNECTION,
     ),
     CONNECTION_BSSID(
-        "connection_bssid_alias",
-        "Connected BSSID alias",
-        "Stable session token for the connected hardware address",
+        "connection_bssid",
+        "Connected BSSID",
+        "Hardware address, or a stable session token when report redaction is enabled",
         WifiLogFieldCategory.CONNECTION,
     ),
     VALIDATION_STATUS(
@@ -199,19 +199,19 @@ enum class WifiLogField(
     IP_ADDRESS(
         "ip_address",
         "IP address",
-        "Masked local IP address",
+        "Local IP address, masked when report redaction is enabled",
         WifiLogFieldCategory.CONNECTION,
     ),
     GATEWAY(
         "gateway",
         "Gateway",
-        "Masked default gateway",
+        "Default gateway, masked when report redaction is enabled",
         WifiLogFieldCategory.CONNECTION,
     ),
     DNS_SERVERS(
         "dns_servers",
         "DNS servers",
-        "Masked DNS server addresses",
+        "DNS server addresses, masked when report redaction is enabled",
         WifiLogFieldCategory.CONNECTION,
     ),
 }
@@ -229,9 +229,10 @@ data class WifiLogRecord(
     val connectionValues: Map<WifiLogField, String?>,
 )
 
-/** Contains redacted values only. */
+/** Memory-only values captured according to the user's report-redaction choice. */
 data class WifiLogSession(
-    val startedAtEpochMinuteMs: Long,
+    val startedAtEpochMs: Long,
+    val redacted: Boolean,
     val selectedFields: Set<WifiLogField>,
     val records: List<WifiLogRecord>,
     val endedAfterMs: Long? = null,

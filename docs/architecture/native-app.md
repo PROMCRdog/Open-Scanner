@@ -10,8 +10,8 @@ flowchart LR
   S --> V["OpenScannerViewModel"]
   P["DataStore preferences"] --> V
   V --> U["Redacted or raw-local UI models"]
-  V --> L["Bounded redacted session logger"]
-  V --> E["Redacted export encoder"]
+  V --> L["Bounded redacted or explicitly raw session logger"]
+  V --> E["Redacted-by-default export encoder"]
   L --> E
   U --> Q["Five Compose workspaces"]
   E --> H["Exact preview, cache file, URI grant, Android share sheet"]
@@ -25,16 +25,16 @@ The coordinator reuses a snapshot sequence when Android returns identical source
 
 The same changed-snapshot stream retains at most 60 presence frames for the selected-AP stability summary. It reports the RSSI range and fraction of assessed snapshots in which the AP was absent; it ignores frames before the AP was first observed and withholds a label until enough evidence exists. The neighborhood posture summary is another pure transformation of the current snapshot.
 
-Wi-Fi session logging is explicit and memory-only. A session owns a random salt used to derive non-reversible in-memory alias keys; raw identifiers and exact wall-clock times are transformed before immutable log records are created. The selected field set is frozen at start. The ViewModel records scanner-state changes and, while the scanner remains live in the foreground, samples the current state at the requested refresh cadence so cached/reused evidence still has an honest growing source age. Records include relative elapsed time and may include scanner phase, source age, AP/radio/security/generation fields, and Android connection/link/address evidence. The recorder stops at 500 state records or 25,000 AP rows.
+Wi-Fi session logging is explicit and memory-only. The selected field set and report-redaction choice are frozen at start. A redacted session owns a random salt used to derive non-reversible in-memory alias keys; raw identifiers and exact wall-clock times are transformed before immutable log records are created. After the user explicitly enables unredacted reports, a new unredacted session retains the selected raw identifier/address fields in memory until clear, replacement, or process exit. The ViewModel records scanner-state changes and, while the scanner remains live in the foreground, samples the current state at the requested refresh cadence so cached/reused evidence still has an honest growing source age. Records include relative elapsed time and may include scanner phase, source age, AP/radio/security/generation fields, and Android connection/link/address evidence. The recorder stops at 500 state records or 25,000 AP rows.
 
-Snapshot and log exports are complete `ExportDocument` values previewed before sharing. `MainActivity` writes the approved payload to `cacheDir/exports`, shares it through a non-exported `FileProvider` and temporary read grant, and removes files older than 24 hours when preparing a later export. No storage permission is used.
+Snapshot and log exports are complete `ExportDocument` values carrying an explicit redaction flag and previewed before sharing. Unredacted documents use conspicuous titles/filenames, a sensitive-data warning, and a dedicated **Share unredacted** confirmation. `MainActivity` writes only the approved payload to `cacheDir/exports`, shares it through a non-exported `FileProvider` and temporary read grant, and deletes it after one hour while the process remains alive or during a later app start/export. No storage permission is used.
 
 ## Dependency direction
 
 - `app` depends on every lower module and Android framework UI APIs.
 - Android data adapters depend on model/domain modules, never on UI.
 - Domain, privacy, and export logic are JVM-testable and do not depend on Android.
-- Snapshot export accepts a raw in-memory snapshot but applies redaction internally before constructing text; log export accepts redacted records only.
+- Snapshot export accepts a raw in-memory snapshot and applies the current report-redaction setting internally. Log export accepts a session whose redaction choice was frozen at recording start.
 
 ## UI layer
 

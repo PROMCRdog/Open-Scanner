@@ -18,7 +18,10 @@ import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import java.io.File
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.openscanner.app.ui.OpenScannerApp
 import org.openscanner.app.ui.theme.OpenScannerTheme
 import org.openscanner.core.export.ExportDocument
@@ -39,6 +42,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        cleanupExpiredExports()
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -56,6 +60,7 @@ class MainActivity : ComponentActivity() {
                     onRefresh = viewModel::requestScan,
                     onPauseChanged = viewModel::setPaused,
                     onPrivacyChanged = viewModel::setPrivacyMode,
+                    onRedactExportsChanged = viewModel::setRedactExports,
                     onRefreshIntervalChanged = viewModel::setRefreshIntervalSeconds,
                     onResetSettings = viewModel::resetSettings,
                     onRequestPermission = ::requestLocationPermission,
@@ -115,10 +120,7 @@ class MainActivity : ComponentActivity() {
             val exportDirectory = File(cacheDir, "exports").apply {
                 check(exists() || mkdirs()) { "Unable to create export directory" }
             }
-            val expirationCutoff = System.currentTimeMillis() - EXPORT_RETENTION_MS
-            exportDirectory.listFiles()
-                ?.filter { it.isFile && it.lastModified() < expirationCutoff }
-                ?.forEach { runCatching { it.delete() } }
+            cleanupExpiredExports()
             val exportFile = nextAvailableExportFile(
                 exportDirectory,
                 safeExportFileName(document.fileName),
@@ -137,13 +139,24 @@ class MainActivity : ComponentActivity() {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             startActivity(Intent.createChooser(intent, "Share ${document.title}"))
+            lifecycleScope.launch {
+                delay(EXPORT_RETENTION_MS)
+                runCatching { exportFile.delete() }
+            }
         }.onFailure {
             Toast.makeText(this, "Unable to prepare export file", Toast.LENGTH_LONG).show()
         }
     }
 
+    private fun cleanupExpiredExports() {
+        val expirationCutoff = System.currentTimeMillis() - EXPORT_RETENTION_MS
+        File(cacheDir, "exports").listFiles()
+            ?.filter { it.isFile && it.lastModified() < expirationCutoff }
+            ?.forEach { runCatching { it.delete() } }
+    }
+
     private companion object {
-        const val EXPORT_RETENTION_MS = 24 * 60 * 60_000L
+        const val EXPORT_RETENTION_MS = 60 * 60_000L
     }
 }
 

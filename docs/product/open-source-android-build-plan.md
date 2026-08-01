@@ -214,8 +214,8 @@ Signal guidance is band/trend aware but states that RSSI is not distance, throug
 Protect raw SSIDs, BSSIDs, IPs, timestamps, aliases, favorites, connection metadata, exports, and the HMAC key. In-scope threats are accidental sharing, logs/crashes, backups, clipboard/URI leakage, malicious dependencies, stale files, screenshots, and bug reports.
 Out of scope are a rooted OS, physical access to an unlocked device, radio-level anonymity, and recipients retaining an approved raw export.
 
-- Local display may show real identifiers because v0.1.0 processes them only on-device, while a visible one-tap Privacy Mode aliases/masks them before UI models and semantics. Privacy Mode always turns on when an export preview opens.
-- Redaction happens before Compose models, semantics, logging, persistence payloads, image/text generation, or error reports.
+- Local display may show real identifiers because v0.1.0 processes them only on-device, while a visible one-tap Privacy Mode aliases/masks them before UI models and semantics. Report redaction is a separate, default-on setting.
+- Redaction happens before Compose models and semantics when Privacy Mode is on, and before logging/export payloads when report redaction is on. Disabling report redaction requires explicit consent and does not affect production logs, crash data, or telemetry.
 - Use aliases `Network 1...n`, mask BSSID/IP, coarsen timestamps, and remove location-adjacent metadata.
 - Production logging is event-code-only; debug logging uses synthetic fixtures and the same safe logger.
 - Set `allowBackup=false` and restrictive data-extraction rules for sensitive stores; disable cleartext traffic.
@@ -230,7 +230,7 @@ Out of scope are a rooted OS, physical access to an unlocked device, radio-level
 Version 0.1.0 persists settings, the install key, hashed-key aliases/favorites, and consent only; snapshots/timelines are RAM-only. Typed DataStore schemas migrate forward and offer safe deletion on corruption.
 Defer Room until saved sessions, which require explicit start/stop, retention, encryption, and migration tests.
 CSV/JSON use a versioned schema with units, age, missing reasons, algorithm version, confidence, and limitations. PNG uses a fixed-layout renderer with evidence footer/legend, never a UI screenshot.
-Generate preview from `RedactedSnapshot`; raw inclusion creates a new preview. Write to `cacheDir/exports`, strip metadata, share via FileProvider, and delete within one hour plus next-launch cleanup.
+Generate a redacted preview by default; raw inclusion creates a conspicuously labelled preview and requires a dedicated share confirmation. Write to `cacheDir/exports`, strip metadata, share via FileProvider, and delete within one hour plus next-launch cleanup.
 Delete-all clears DataStore, cached exports, RAM history, and the Keystore key, then reports what was removed.
 
 ## 14. Performance and efficiency budgets

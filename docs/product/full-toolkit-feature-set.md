@@ -41,7 +41,7 @@ This proposal is an independent product cut derived only from the reference feat
 - A requested refresh interval is never presented as a guaranteed radio scan interval.
 - Every derived score identifies its inputs, sample age, missing inputs, and confidence.
 - Regulatory domain, DFS status, and channel-width assumptions are never silently guessed.
-- Privacy redaction occurs before rendering, persistence, logging, export, or bug-report attachment.
+- Privacy redaction occurs before rendering, persistence, logging, export, or bug-report attachment by default; raw reports require explicit opt-in and exact-preview confirmation.
 - Raw SSIDs, BSSIDs, IPs, and scan results never enter analytics, crash reports, or network requests.
 - The app remains useful when permissions are denied; each unavailable feature explains why and offers the relevant system action.
 - Accessibility semantics, 48 dp targets, color-independent encoding, scalable text, and reduced motion are release gates.
@@ -200,7 +200,7 @@ This proposal is an independent product cut derived only from the reference feat
 | Ten-star recommendation precision | Replace with a coarse rating, recommendation rationale, confidence, and regulatory unknowns. |
 | Deprecated in-app connection flow | Remove; delegate joining and credentials to Android-owned UI. |
 | Rough distance shown prominently | Demote to an optional, caveated estimate; tracker uses BSSID and signal trend. |
-| Raw identifier export | Replace with global redaction and redacted-by-default preview/export. |
+| Raw identifier export | Permit only as an explicit redaction-setting opt-out with sensitive-data warning, labelled exact preview, and per-share confirmation. |
 | Fixed external reachability probes | Replace with OS validation for MVP and disclosed opt-in endpoints later. |
 | Stale guide claims: discovery, speed test, router admin | Treat as post-MVP active tools with consent and network/privacy safeguards, not launch blockers. |
 | External AI/widgets claims | Widget is post-MVP and stale-aware; unexplained AI analysis is excluded. |
@@ -215,7 +215,7 @@ The MVP is ready only when all of the following are demonstrated on supported st
 - 2.4/5/6 GHz channel conversion and width rendering have unit tests, including unknown and malformed inputs.
 - Security parsing has fixtures for modern, legacy, open, enterprise, and unknown capabilities.
 - Recommendation fixtures expose every input and produce “insufficient information” when regulatory or sample evidence is inadequate.
-- Export tests prove Privacy Mode redacts identifiers before bitmap/text generation and removes temporary files.
+- Export tests prove report redaction masks identifiers before text generation, raw output requires explicit selection, and temporary files expire.
 - No raw network identifier appears in logs, analytics, crash payloads, or default persisted state.
 - TalkBack can reach and identify every action; large text does not hide values or controls; graphs have equivalent text summaries.
 - Active network traffic is absent from the MVP except Android/system behavior and the user’s explicit share action.

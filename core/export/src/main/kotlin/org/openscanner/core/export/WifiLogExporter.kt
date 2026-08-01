@@ -23,11 +23,14 @@ object WifiLogExporter {
             WifiLogFormat.JSON -> toJson(session)
             WifiLogFormat.CSV -> toCsv(session)
         }
+        val privacyLabel = if (session.redacted) "Redacted" else "Unredacted"
         return ExportDocument(
-            title = "Redacted Wi-Fi log · ${format.label}",
-            fileName = "open-scanner-wifi-log-${fileTimestamp.format(Instant.ofEpochMilli(session.startedAtEpochMinuteMs))}.${format.extension}",
+            title = "$privacyLabel Wi-Fi log · ${format.label}",
+            fileName = "open-scanner-wifi-log${if (session.redacted) "" else "-unredacted"}-" +
+                "${fileTimestamp.format(Instant.ofEpochMilli(session.startedAtEpochMs))}.${format.extension}",
             mimeType = format.mimeType,
-            shareSubject = "Open Scanner redacted Wi-Fi log",
+            shareSubject = "Open Scanner ${privacyLabel.lowercase()} Wi-Fi log",
+            redacted = session.redacted,
             content = content,
         )
     }
@@ -36,12 +39,21 @@ object WifiLogExporter {
         appendLine("OPEN SCANNER WI-FI LOG")
         appendLine("========================")
         appendLine("Schema: open-scanner.wifi-log.v1")
-        appendLine("Started (UTC, minute precision): ${Instant.ofEpochMilli(session.startedAtEpochMinuteMs)}")
+        appendLine(
+            "Started (UTC${if (session.redacted) ", minute precision" else ""}): " +
+                Instant.ofEpochMilli(session.startedAtEpochMs),
+        )
         appendLine("Duration: ${formatDuration(session.durationMs)}")
         appendLine("Records: ${session.records.size}")
         appendLine("Access-point rows: ${session.networkRowCount}")
         appendLine("Status: ${session.stopReason?.label ?: "Recording snapshot"}")
-        appendLine("Privacy: redacted before capture; raw SSIDs, BSSIDs, and local addresses are absent")
+        appendLine(
+            if (session.redacted) {
+                "Privacy: redacted before capture; raw SSIDs, BSSIDs, and local addresses are absent"
+            } else {
+                "Privacy: UNREDACTED by explicit user choice; SSIDs, BSSIDs, and local addresses may be present"
+            },
+        )
         appendLine("Limits: passive Android evidence may be cached or throttled; RSSI is not distance or throughput")
         appendLine()
         WifiLogFieldCategory.entries.forEach { category ->
@@ -82,8 +94,8 @@ object WifiLogExporter {
     private fun toJson(session: WifiLogSession): String = buildString {
         appendLine("{")
         appendLine("  \"schema\": \"open-scanner.wifi-log.v1\",")
-        appendLine("  \"redacted\": true,")
-        appendLine("  \"started_at_utc_minute\": \"${Instant.ofEpochMilli(session.startedAtEpochMinuteMs)}\",")
+        appendLine("  \"redacted\": ${session.redacted},")
+        appendLine("  \"started_at_utc\": \"${Instant.ofEpochMilli(session.startedAtEpochMs)}\",")
         appendLine("  \"duration_ms\": ${session.durationMs},")
         appendLine("  \"stop_reason\": ${jsonStringOrNull(session.stopReason?.name)},")
         appendLine("  \"limitations\": \"Passive Android evidence may be cached or throttled; RSSI is not distance or throughput\",")
@@ -139,16 +151,18 @@ object WifiLogExporter {
 
     private fun toCsv(session: WifiLogSession): String = buildString {
         val fields = orderedFields(session)
-        val headers = listOf("schema", "record_index", "elapsed_ms", "record_type", "network_index") +
+        val headers = listOf("schema", "redacted", "record_index", "elapsed_ms", "record_type", "network_index") +
             fields.map { it.key }
         appendLine(headers.joinToString(",", transform = ::escapeCsv))
         session.records.forEach { record ->
-            if (record.scanValues.isNotEmpty()) appendCsvRow(record, "scan", null, record.scanValues, fields)
+            if (record.scanValues.isNotEmpty()) {
+                appendCsvRow(record, "scan", null, record.scanValues, fields, session.redacted)
+            }
             if (record.connectionValues.isNotEmpty()) {
-                appendCsvRow(record, "connection", null, record.connectionValues, fields)
+                appendCsvRow(record, "connection", null, record.connectionValues, fields, session.redacted)
             }
             record.networkValues.forEachIndexed { index, values ->
-                appendCsvRow(record, "network", index + 1, values, fields)
+                appendCsvRow(record, "network", index + 1, values, fields, session.redacted)
             }
         }
     }
@@ -159,9 +173,11 @@ object WifiLogExporter {
         networkIndex: Int?,
         values: Map<WifiLogField, String?>,
         fields: List<WifiLogField>,
+        redacted: Boolean,
     ) {
         val row = listOf(
             "open-scanner.wifi-log.v1",
+            redacted.toString(),
             record.index.toString(),
             record.elapsedMs.toString(),
             recordType,

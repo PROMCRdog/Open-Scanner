@@ -24,12 +24,12 @@ import org.openscanner.core.domain.SignalHistoryPolicy
 import org.openscanner.core.domain.WifiChannelMapper
 import org.openscanner.core.export.ExportDocument
 import org.openscanner.core.export.ExportFormat
-import org.openscanner.core.export.RedactedWifiLogRecorder
 import org.openscanner.core.export.SnapshotExporter
 import org.openscanner.core.export.WifiLogExporter
 import org.openscanner.core.export.WifiLogField
 import org.openscanner.core.export.WifiLogFormat
 import org.openscanner.core.export.WifiLogRecordResult
+import org.openscanner.core.export.WifiLogRecorder
 import org.openscanner.core.export.WifiLogSession
 import org.openscanner.core.model.AccessPointObservation
 import org.openscanner.core.model.AppPreferences
@@ -55,7 +55,7 @@ class OpenScannerViewModel(
     private val loggingActive = MutableStateFlow(false)
     private val loggingStartedAtElapsedMs = MutableStateFlow<Long?>(null)
     private val opaqueIds = mutableMapOf<String, String>()
-    private var logRecorder: RedactedWifiLogRecorder? = null
+    private var logRecorder: WifiLogRecorder? = null
     private var nextLoggingSampleAtElapsedMs: Long? = null
     private var currentRefreshIntervalSeconds = 30
 
@@ -266,6 +266,10 @@ class OpenScannerViewModel(
         viewModelScope.launch { settingsRepository.setPrivacyMode(enabled) }
     }
 
+    fun setRedactExports(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setRedactExports(enabled) }
+    }
+
     fun setRefreshIntervalSeconds(seconds: Int) {
         viewModelScope.launch { settingsRepository.setRefreshIntervalSeconds(seconds) }
     }
@@ -291,10 +295,11 @@ class OpenScannerViewModel(
         val scannerState = wifiRepository.state.value
         if (scannerState.snapshot == null) return
         val nowElapsed = SystemClock.elapsedRealtime()
-        val recorder = RedactedWifiLogRecorder(
+        val recorder = WifiLogRecorder(
             selectedFields = selectedLogFields.value,
             startedAtEpochMs = System.currentTimeMillis(),
             startedAtElapsedMs = nowElapsed,
+            redacted = uiState.value.redactExports,
         )
         logRecorder = recorder
         loggingStartedAtElapsedMs.value = nowElapsed
@@ -321,7 +326,9 @@ class OpenScannerViewModel(
     }
 
     fun buildSnapshotExport(format: ExportFormat): ExportDocument? =
-        wifiRepository.state.value.snapshot?.let { SnapshotExporter.exportDocument(it, format) }
+        wifiRepository.state.value.snapshot?.let {
+            SnapshotExporter.exportDocument(it, format, redacted = uiState.value.redactExports)
+        }
 
     fun buildWifiLogExport(format: WifiLogFormat): ExportDocument? =
         logSession.value?.takeIf { it.records.isNotEmpty() && !loggingActive.value }
@@ -476,6 +483,7 @@ class OpenScannerViewModel(
                     controls.logging.session?.durationMs ?: 0L
                 },
                 stopReason = controls.logging.session?.stopReason,
+                redacted = controls.logging.session?.redacted,
             ),
         )
     }

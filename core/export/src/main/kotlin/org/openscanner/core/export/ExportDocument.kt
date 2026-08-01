@@ -6,5 +6,6 @@ data class ExportDocument(
     val fileName: String,
     val mimeType: String,
     val shareSubject: String,
+    val redacted: Boolean,
     val content: String,
 )

@@ -16,16 +16,22 @@ enum class WifiLogRecordResult {
 }
 
 /**
- * Memory-only session recorder. Raw identifiers are used only long enough to
- * assign a stable alias and are transformed before a [WifiLogRecord] exists.
+ * Memory-only session recorder. Redacted sessions transform identifiers before
+ * a [WifiLogRecord] exists. Unredacted sessions retain selected raw values only
+ * after the user has explicitly opted in.
  */
-class RedactedWifiLogRecorder(
+class WifiLogRecorder(
     selectedFields: Set<WifiLogField>,
     startedAtEpochMs: Long,
     private val startedAtElapsedMs: Long,
+    val redacted: Boolean = true,
 ) {
     val selectedFields: Set<WifiLogField> = selectedFields.toSet()
-    val startedAtEpochMinuteMs: Long = startedAtEpochMs - startedAtEpochMs % 60_000L
+    val startedAtEpochMs: Long = if (redacted) {
+        startedAtEpochMs - startedAtEpochMs % 60_000L
+    } else {
+        startedAtEpochMs
+    }
 
     private val records = mutableListOf<WifiLogRecord>()
     private val aliasSalt = ByteArray(32).also(SecureRandom()::nextBytes)
@@ -58,9 +64,11 @@ class RedactedWifiLogRecorder(
         }
 
         val elapsedMs = (recordedAtElapsedMs - startedAtElapsedMs).coerceAtLeast(0L)
-        snapshot?.observations.orEmpty().forEach(::aliasFor)
-        val redactedNetworks = if (selectedFields.any { it.category == WifiLogFieldCategory.NETWORK }) {
-            snapshot?.observations.orEmpty().map(::redactObservation)
+        if (redacted) snapshot?.observations.orEmpty().forEach(::aliasFor)
+        val recordedNetworks = if (selectedFields.any { it.category == WifiLogFieldCategory.NETWORK }) {
+            snapshot?.observations.orEmpty().map { observation ->
+                if (redacted) redactObservation(observation) else observation
+            }
         } else {
             emptyList()
         }
@@ -68,10 +76,10 @@ class RedactedWifiLogRecorder(
             index = records.size + 1,
             elapsedMs = elapsedMs,
             scanValues = buildScanValues(state, recordedAtElapsedMs),
-            networkValues = redactedNetworks.map { buildNetworkValues(it, recordedAtElapsedMs) },
+            networkValues = recordedNetworks.map { buildNetworkValues(it, recordedAtElapsedMs) },
             connectionValues = buildConnectionValues(snapshot?.connection),
         )
-        loggedNetworkRows += redactedNetworks.size
+        loggedNetworkRows += recordedNetworks.size
         lastStateFingerprint = fingerprint
         return WifiLogRecordResult.ADDED
     }
@@ -83,7 +91,8 @@ class RedactedWifiLogRecorder(
     }
 
     fun snapshot(): WifiLogSession = WifiLogSession(
-        startedAtEpochMinuteMs = startedAtEpochMinuteMs,
+        startedAtEpochMs = startedAtEpochMs,
+        redacted = redacted,
         selectedFields = selectedFields,
         records = records.toList(),
         endedAfterMs = stoppedAfterMs,
@@ -146,25 +155,27 @@ class RedactedWifiLogRecorder(
 
     private fun buildConnectionValues(connection: ConnectionEvidence?): Map<WifiLogField, String?> {
         if (connection == null) return selectedValues(WifiLogFieldCategory.CONNECTION) { null }
-        val redacted = PrivacyRedactor.redact(connection)
-        val connectedAliasNumber = connection.bssid?.let(::aliasForIdentifier)
-        val connectedAlias = connectedAliasNumber
+        val recordedConnection = if (redacted) PrivacyRedactor.redact(connection) else connection
+        val connectedAliasNumber = if (redacted) connection.bssid?.let(::aliasForIdentifier) else null
+        val recordedNetworkName = connectedAliasNumber
             ?.let { "Network $it" }
-            ?: redacted.ssid
+            ?: recordedConnection.ssid
         return selectedValues(WifiLogFieldCategory.CONNECTION) { field ->
             when (field) {
-                WifiLogField.CONNECTION_STATUS -> redacted.connected.toString()
-                WifiLogField.CONNECTION_NETWORK -> connectedAlias
-                WifiLogField.CONNECTION_BSSID -> connectedAliasNumber?.let(::accessPointAlias) ?: redacted.bssid
-                WifiLogField.VALIDATION_STATUS -> redacted.validated?.toString()
-                WifiLogField.CAPTIVE_PORTAL -> redacted.captivePortal?.toString()
+                WifiLogField.CONNECTION_STATUS -> recordedConnection.connected.toString()
+                WifiLogField.CONNECTION_NETWORK -> recordedNetworkName
+                WifiLogField.CONNECTION_BSSID ->
+                    connectedAliasNumber?.let(::accessPointAlias) ?: recordedConnection.bssid
+                WifiLogField.VALIDATION_STATUS -> recordedConnection.validated?.toString()
+                WifiLogField.CAPTIVE_PORTAL -> recordedConnection.captivePortal?.toString()
                 WifiLogField.LINK_SPEEDS ->
-                    "link=${redacted.linkSpeedMbps ?: "unavailable"}; " +
-                        "rx=${redacted.rxLinkSpeedMbps ?: "unavailable"}; " +
-                        "tx=${redacted.txLinkSpeedMbps ?: "unavailable"}"
-                WifiLogField.IP_ADDRESS -> redacted.ipAddress
-                WifiLogField.GATEWAY -> redacted.gateway
-                WifiLogField.DNS_SERVERS -> redacted.dnsServers.takeIf { it.isNotEmpty() }?.joinToString("; ")
+                    "link=${recordedConnection.linkSpeedMbps ?: "unavailable"}; " +
+                        "rx=${recordedConnection.rxLinkSpeedMbps ?: "unavailable"}; " +
+                        "tx=${recordedConnection.txLinkSpeedMbps ?: "unavailable"}"
+                WifiLogField.IP_ADDRESS -> recordedConnection.ipAddress
+                WifiLogField.GATEWAY -> recordedConnection.gateway
+                WifiLogField.DNS_SERVERS ->
+                    recordedConnection.dnsServers.takeIf { it.isNotEmpty() }?.joinToString("; ")
                 else -> null
             }
         }
