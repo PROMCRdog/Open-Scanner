@@ -22,6 +22,7 @@ import org.openscanner.core.model.ScannerPhase
 import org.openscanner.core.model.SecurityType
 import org.openscanner.core.model.WifiBand
 import org.openscanner.core.model.WifiChannelGroup
+import org.openscanner.core.model.WifiGeneration
 
 class OpenScannerAppTest {
     @get:Rule
@@ -514,7 +515,7 @@ class OpenScannerAppTest {
                 channelWidthMhz = 80,
                 signalDbm = -52,
                 securityTypes = setOf(SecurityType.WPA3_PERSONAL),
-                generation = "Wi-Fi 6",
+                generation = WifiGeneration.WIFI_6,
                 connected = true,
                 selected = true,
             ),
@@ -531,7 +532,7 @@ class OpenScannerAppTest {
             channelWidthMhz = 80,
             signalDbm = -52,
             securityTypes = setOf(SecurityType.WPA3_PERSONAL),
-            generation = "Wi-Fi 6",
+            generation = WifiGeneration.WIFI_6,
             connected = true,
             selected = true,
         ),

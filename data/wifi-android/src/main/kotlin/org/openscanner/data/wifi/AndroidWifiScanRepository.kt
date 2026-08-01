@@ -35,9 +35,11 @@ import org.openscanner.core.domain.SecurityParser
 import org.openscanner.core.domain.WifiChannelMapper
 import org.openscanner.core.model.AccessPointObservation
 import org.openscanner.core.model.ConnectionEvidence
+import org.openscanner.core.model.HIDDEN_NETWORK_SSID
 import org.openscanner.core.model.PlatformCapabilities
 import org.openscanner.core.model.ScanSnapshot
 import org.openscanner.core.model.ScannerPhase
+import org.openscanner.core.model.UNAVAILABLE_BSSID
 import org.openscanner.core.model.ScannerState
 import org.openscanner.core.model.SecurityType
 import org.openscanner.core.model.WifiGeneration
@@ -643,8 +645,8 @@ class AndroidWifiScanRepository(
         }
         return AccessPointObservation(
             id = normalizedBssid.ifBlank { "unknown-${frequency}-${timestamp}" },
-            ssid = SSID.takeUnless { it.isNullOrBlank() } ?: "Hidden network",
-            bssid = normalizedBssid.ifBlank { "Unavailable" },
+            ssid = SSID.takeUnless { it.isNullOrBlank() } ?: HIDDEN_NETWORK_SSID,
+            bssid = normalizedBssid.ifBlank { UNAVAILABLE_BSSID },
             channel = WifiChannelMapper.fromFrequency(frequency),
             channelWidthMhz = mapPlatformChannelWidth(channelWidth),
             footprintCenterFrequencyMhz = centerFreq0.takeIf { it > 0 } ?: frequency,

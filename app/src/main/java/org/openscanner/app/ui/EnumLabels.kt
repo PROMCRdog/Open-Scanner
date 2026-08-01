@@ -3,11 +3,15 @@ package org.openscanner.app.ui
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import org.openscanner.app.ConnectionUiModel
+import org.openscanner.app.NetworkNameKind
+import org.openscanner.app.NetworkUiModel
 import org.openscanner.app.R
 import org.openscanner.core.domain.AccessPointStabilityLevel
 import org.openscanner.core.domain.ObservedCongestion
 import org.openscanner.core.domain.SignalQuality
 import org.openscanner.core.model.SecurityType
+import org.openscanner.core.model.WifiGeneration
 
 /**
  * Resolves the user-facing display label for core-module enums at the
@@ -70,3 +74,41 @@ fun SecurityType.displayLabel(): String = stringResource(labelRes())
 @Composable
 fun Set<SecurityType>.displayLabel(): String =
     map { it.displayLabel() }.joinToString(" + ")
+
+@StringRes
+private fun WifiGeneration.labelRes(): Int = when (this) {
+    WifiGeneration.LEGACY -> R.string.label_wifi_generation_legacy
+    WifiGeneration.WIFI_4 -> R.string.label_wifi_generation_wifi_4
+    WifiGeneration.WIFI_5 -> R.string.label_wifi_generation_wifi_5
+    WifiGeneration.WIFI_6 -> R.string.label_wifi_generation_wifi_6
+    WifiGeneration.WIFI_6E -> R.string.label_wifi_generation_wifi_6e
+    WifiGeneration.WIFI_7 -> R.string.label_wifi_generation_wifi_7
+    WifiGeneration.UNKNOWN -> R.string.label_wifi_generation_unknown
+}
+
+@Composable
+fun WifiGeneration.displayLabel(): String = stringResource(labelRes())
+
+/** Resolves semantic placeholders without translating a real SSID by pattern. */
+@Composable
+fun NetworkUiModel.displayName(): String = when (nameKind) {
+    NetworkNameKind.OBSERVED -> name
+    NetworkNameKind.HIDDEN -> stringResource(R.string.common_hidden_network)
+    NetworkNameKind.PRIVACY_ALIAS -> privacyAliasNumber?.let {
+        stringResource(R.string.common_private_network_alias, it)
+    } ?: name
+}
+
+@Composable
+fun ConnectionUiModel.displayNetworkName(unavailable: String): String = when {
+    networkName == null -> unavailable
+    networkNameRedacted -> stringResource(R.string.common_connected_network_alias)
+    else -> networkName
+}
+
+@Composable
+fun Boolean?.displayLabel(unavailable: String): String = when (this) {
+    true -> stringResource(R.string.common_yes)
+    false -> stringResource(R.string.common_no)
+    null -> unavailable
+}

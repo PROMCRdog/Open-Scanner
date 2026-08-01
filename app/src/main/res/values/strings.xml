@@ -30,6 +30,11 @@
     <string name="common_status_description">Scanner status: %1$s</string>
     <string name="common_cd_selected">, selected</string>
     <string name="common_cd_unavailable">, unavailable: %1$s</string>
+    <string name="common_hidden_network">Hidden network</string>
+    <string name="common_private_network_alias">Network %1$d</string>
+    <string name="common_connected_network_alias">Connected network</string>
+    <string name="common_yes">Yes</string>
+    <string name="common_no">No</string>
     <string name="common_unavailable_permission_title">Nearby Wi-Fi permission</string>
     <string name="common_unavailable_permission_body">Android requires precise location permission to expose nearby access points. Scan data stays on this device.</string>
     <string name="common_unavailable_wifi_off_title">Wi-Fi is off</string>
@@ -310,6 +315,13 @@
     <string name="label_security_wpa3_enterprise">WPA3 Enterprise</string>
     <string name="label_security_wapi">WAPI</string>
     <string name="label_security_unknown">Unknown</string>
+    <string name="label_wifi_generation_legacy">Legacy</string>
+    <string name="label_wifi_generation_wifi_4">Wi-Fi 4</string>
+    <string name="label_wifi_generation_wifi_5">Wi-Fi 5</string>
+    <string name="label_wifi_generation_wifi_6">Wi-Fi 6</string>
+    <string name="label_wifi_generation_wifi_6e">Wi-Fi 6E</string>
+    <string name="label_wifi_generation_wifi_7">Wi-Fi 7</string>
+    <string name="label_wifi_generation_unknown">Unknown</string>
     <string name="label_channel_group_ghz_2_4">2.4 GHz</string>
     <string name="label_channel_group_ghz_5_2">5.2 GHz</string>
     <string name="label_channel_group_ghz_5_5_dfs">5.5 GHz / DFS</string>

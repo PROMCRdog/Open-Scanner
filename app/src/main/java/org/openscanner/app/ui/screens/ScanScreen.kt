@@ -53,6 +53,7 @@ import org.openscanner.app.ui.components.ChannelGroupSelector
 import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.SignalGlyph
 import org.openscanner.app.ui.displayLabel
+import org.openscanner.app.ui.displayName
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
 import org.openscanner.app.ui.theme.ScannerIconWell
@@ -78,7 +79,7 @@ fun ScanScreen(
         .filter { it.channelGroup == state.selectedChannelGroup }
         .filter {
             query.isBlank() || it.name.contains(query, ignoreCase = true) ||
-                it.bssid.contains(query, ignoreCase = true)
+                it.bssid.orEmpty().contains(query, ignoreCase = true)
         }
         .toList()
     val accessPointCountNoun = stringResource(
@@ -235,6 +236,7 @@ private fun StateBadge(
 @Composable
 private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
     val rowShape = MaterialTheme.shapes.small
+    val displayName = network.displayName()
     val securityLabel = network.securityTypes.displayLabel()
     val connectionHighlight = if (network.connected) {
         Modifier
@@ -244,7 +246,7 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
         Modifier
     }
     val rowDescription = buildString {
-        append(stringResource(R.string.scan_row_description_base, network.name, network.signalDbm, network.channelGroup.displayLabel()))
+        append(stringResource(R.string.scan_row_description_base, displayName, network.signalDbm, network.channelGroup.displayLabel()))
         network.channel?.let { append(stringResource(R.string.scan_row_description_channel, it)) }
         append(stringResource(R.string.scan_row_description_security, securityLabel))
         if (network.connected) append(stringResource(R.string.scan_row_description_connected))
@@ -267,7 +269,7 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
             SignalGlyph(network.signalDbm)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
                 Text(
-                    network.name,
+                    displayName,
                     color = ScannerText,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,

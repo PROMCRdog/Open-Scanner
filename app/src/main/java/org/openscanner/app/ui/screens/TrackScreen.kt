@@ -59,6 +59,7 @@ import org.openscanner.app.ui.components.PrimaryAction
 import org.openscanner.app.ui.components.SignalGlyph
 import org.openscanner.app.ui.components.SignalHistoryChart
 import org.openscanner.app.ui.displayLabel
+import org.openscanner.app.ui.displayName
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
 import org.openscanner.app.ui.theme.ScannerIconWell
@@ -207,10 +208,11 @@ fun TrackScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(ScannerSpacing.Md),
                         ) {
+                            val candidateName = candidate.displayName()
                             SignalGlyph(candidate.signalDbm)
                             Column(Modifier.weight(1f)) {
                                 Text(
-                                    candidate.name,
+                                    candidateName,
                                     color = ScannerText,
                                     style = MaterialTheme.typography.titleMedium,
                                     maxLines = 1,
@@ -262,7 +264,8 @@ private fun stabilityDescription(state: OpenScannerUiState): String {
 
 @Composable
 private fun SelectedNetworkCard(network: NetworkUiModel, onClick: () -> Unit) {
-    val chooseNetworkContentDescription = stringResource(R.string.track_choose_network_cd, network.name)
+    val displayName = network.displayName()
+    val chooseNetworkContentDescription = stringResource(R.string.track_choose_network_cd, displayName)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -280,7 +283,7 @@ private fun SelectedNetworkCard(network: NetworkUiModel, onClick: () -> Unit) {
     ) {
         SignalGlyph(network.signalDbm)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
-            Text(network.name, color = ScannerText, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(displayName, color = ScannerText, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 stringResource(
                     R.string.track_selected_network_details,

@@ -1,5 +1,9 @@
 package org.openscanner.core.model
 
+/** Stable, locale-neutral sentinels used at the Android boundary and in exports. */
+const val HIDDEN_NETWORK_SSID = "Hidden network"
+const val UNAVAILABLE_BSSID = "Unavailable"
+
 enum class WifiBand(val label: String) {
     GHZ_2_4("2.4 GHz"),
     GHZ_5("5 GHz"),
