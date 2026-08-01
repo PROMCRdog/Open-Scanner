@@ -70,7 +70,6 @@ import org.openscanner.app.ui.theme.ScannerSpacing
 import org.openscanner.app.ui.theme.ScannerSurface
 import org.openscanner.app.ui.theme.ScannerSurfaceRaised
 import org.openscanner.app.ui.theme.ScannerText
-import org.openscanner.core.model.ScannerPhase
 import org.openscanner.core.model.WifiRefreshIntervalPolicy
 
 @Composable
@@ -126,7 +125,10 @@ fun SettingsScreen(
             detail = stringResource(R.string.settings_android_wifi_detail),
             onClick = onOpenWifiSettings,
         )
-        WifiScanThrottleStatusRow(state.capabilities.wifiScanThrottleEnabled)
+        WifiScanThrottleStatusRow(
+            enabled = state.capabilities.wifiScanThrottleEnabled,
+            resolved = state.capabilities.wifiScanThrottleStateResolved,
+        )
         SettingsRow(
             icon = Icons.Rounded.Schedule,
             label = stringResource(R.string.settings_refresh_interval_label),
@@ -141,7 +143,7 @@ fun SettingsScreen(
         RefreshIntervalSelector(
             selectedSeconds = state.refreshIntervalSeconds,
             wifiScanThrottleEnabled = state.capabilities.wifiScanThrottleEnabled,
-            throttleStatusChecking = state.phase == ScannerPhase.CHECKING,
+            throttleStatusChecking = !state.capabilities.wifiScanThrottleStateResolved,
             onSelect = onRefreshIntervalChanged,
         )
         SectionLabel(stringResource(R.string.settings_section_project))
@@ -373,21 +375,24 @@ private fun ToggleRow(
 }
 
 @Composable
-private fun WifiScanThrottleStatusRow(enabled: Boolean?) {
-    val status = when (enabled) {
-        true -> stringResource(R.string.settings_status_on)
-        false -> stringResource(R.string.settings_status_off)
-        null -> stringResource(R.string.settings_status_na)
+private fun WifiScanThrottleStatusRow(enabled: Boolean?, resolved: Boolean) {
+    val status = when {
+        !resolved -> stringResource(R.string.settings_status_checking)
+        enabled == true -> stringResource(R.string.settings_status_on)
+        enabled == false -> stringResource(R.string.settings_status_off)
+        else -> stringResource(R.string.settings_status_na)
     }
-    val statusColor = when (enabled) {
-        true -> ScannerAmber
-        false -> ScannerCyan
-        null -> ScannerMuted
+    val statusColor = when {
+        !resolved -> ScannerMuted
+        enabled == true -> ScannerAmber
+        enabled == false -> ScannerCyan
+        else -> ScannerMuted
     }
-    val detail = when (enabled) {
-        true -> stringResource(R.string.settings_wifi_scan_throttling_detail_on)
-        false -> stringResource(R.string.settings_wifi_scan_throttling_detail_off)
-        null -> stringResource(R.string.settings_wifi_scan_throttling_detail_unavailable)
+    val detail = when {
+        !resolved -> stringResource(R.string.settings_wifi_scan_throttling_detail_checking)
+        enabled == true -> stringResource(R.string.settings_wifi_scan_throttling_detail_on)
+        enabled == false -> stringResource(R.string.settings_wifi_scan_throttling_detail_off)
+        else -> stringResource(R.string.settings_wifi_scan_throttling_detail_unavailable)
     }
     val throttleLabel = stringResource(R.string.settings_wifi_scan_throttling_label)
     val rowContentDescription = stringResource(R.string.settings_wifi_scan_throttling_cd, status, detail)

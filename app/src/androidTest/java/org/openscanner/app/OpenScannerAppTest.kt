@@ -348,6 +348,23 @@ class OpenScannerAppTest {
     }
 
     @Test
+    fun fiveSecondRefreshExplainsUnresolvedThrottleState() {
+        val reason = "Checking Wi-Fi scan throttling before enabling 5 s request mode."
+        showSettings(
+            state = liveState().copy(
+                capabilities = liveState().capabilities.copy(
+                    wifiScanThrottleEnabled = null,
+                    wifiScanThrottleStateResolved = false,
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithText(reason).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("5 s option disabled. $reason").assertIsNotEnabled()
+        composeRule.onNodeWithText("Checking").assertIsDisplayed()
+    }
+
+    @Test
     fun settingsAboutUsesBuildVersion() {
         showSettings(state = liveState())
 

@@ -198,8 +198,8 @@ class OpenScannerViewModel(
                 .distinctUntilChangedBy { (refreshIntervalSeconds, scannerState) ->
                     Triple(
                         refreshIntervalSeconds,
-                        scannerState.phase,
                         scannerState.capabilities.wifiScanThrottleEnabled,
+                        scannerState.capabilities.wifiScanThrottleStateResolved,
                     )
                 }
                 .collect { (refreshIntervalSeconds, scannerState) ->

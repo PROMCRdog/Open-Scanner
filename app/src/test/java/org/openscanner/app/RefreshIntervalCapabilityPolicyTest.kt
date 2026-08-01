@@ -10,11 +10,29 @@ import org.openscanner.core.model.WifiRefreshIntervalPolicy
 
 class RefreshIntervalCapabilityPolicyTest {
     @Test
-    fun savedFastIntervalIsNotResetWhileCapabilityDiscoveryIsChecking() {
+    fun savedFastIntervalIsNotResetWhileCapabilityDiscoveryIsUnresolved() {
         assertFalse(
             RefreshIntervalCapabilityPolicy.shouldResetSavedFastInterval(
                 refreshIntervalSeconds = WifiRefreshIntervalPolicy.FAST_SECONDS,
-                scannerState = scannerState(ScannerPhase.CHECKING, wifiScanThrottleEnabled = null),
+                scannerState = scannerState(
+                    phase = ScannerPhase.CHECKING,
+                    wifiScanThrottleEnabled = null,
+                    wifiScanThrottleStateResolved = false,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun resolvedUnavailableStateResetsEvenWhileInitialScanIsChecking() {
+        assertTrue(
+            RefreshIntervalCapabilityPolicy.shouldResetSavedFastInterval(
+                refreshIntervalSeconds = WifiRefreshIntervalPolicy.FAST_SECONDS,
+                scannerState = scannerState(
+                    phase = ScannerPhase.CHECKING,
+                    wifiScanThrottleEnabled = null,
+                    wifiScanThrottleStateResolved = true,
+                ),
             ),
         )
     }
@@ -62,6 +80,7 @@ class RefreshIntervalCapabilityPolicyTest {
     private fun scannerState(
         phase: ScannerPhase,
         wifiScanThrottleEnabled: Boolean?,
+        wifiScanThrottleStateResolved: Boolean = true,
     ) = ScannerState(
         phase = phase,
         capabilities = PlatformCapabilities(
@@ -69,6 +88,7 @@ class RefreshIntervalCapabilityPolicyTest {
             supports5Ghz = true,
             supports6Ghz = false,
             wifiScanThrottleEnabled = wifiScanThrottleEnabled,
+            wifiScanThrottleStateResolved = wifiScanThrottleStateResolved,
         ),
     )
 }

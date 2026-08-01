@@ -64,6 +64,7 @@ class AndroidWifiScanRepository(
     @Volatile
     private var paused = false
     private var requestedRefreshIntervalSeconds = WifiRefreshIntervalPolicy.DEFAULT_SECONDS
+    private var newestAcceptedSourceTimestampMicros: Long? = null
     private val cadenceController = ScanCadenceController()
     private val cadenceWakeups = Channel<Unit>(Channel.CONFLATED)
     private var cadenceJob: Job? = null
@@ -188,6 +189,7 @@ class AndroidWifiScanRepository(
             supports6Ghz = hasWifi && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
                 runCatching { wifiManager?.is6GHzBandSupported == true }.getOrDefault(false),
             wifiScanThrottleEnabled = if (hasWifi) readWifiScanThrottleEnabled() else null,
+            wifiScanThrottleStateResolved = true,
         )
     }
 
@@ -278,9 +280,9 @@ class AndroidWifiScanRepository(
     private fun executeScanRequest() {
         val capabilities = platformCapabilities()
         val blockedPhase = currentBlockedPhase(capabilities)
+        applyCapabilityState(capabilities, blockedPhase)
         if (blockedPhase != null) {
             synchronized(stateLock) { cadenceController.markRequestRejected() }
-            applyCapabilityState(capabilities, blockedPhase)
             return
         }
 
@@ -387,6 +389,7 @@ class AndroidWifiScanRepository(
                     previous = previousSnapshot,
                     observations = observations,
                     resultsUpdated = resultsUpdated,
+                    newestAcceptedSourceTimestampMicros = newestAcceptedSourceTimestampMicros,
                 )
                 val snapshot = if (!fresh && previousSnapshot != null) {
                     refreshReusedSnapshot(
@@ -399,11 +402,17 @@ class AndroidWifiScanRepository(
                     )
                 } else if (fresh) {
                     val nowElapsed = SystemClock.elapsedRealtime()
+                    val newestSourceTimestampMicros = observations
+                        .maxOfOrNull { it.timestampMicros }
+                        ?.takeIf { it > 0L }
+                    if (newestSourceTimestampMicros != null) {
+                        newestAcceptedSourceTimestampMicros = newestSourceTimestampMicros
+                    }
                     ScanSnapshot(
                         sequenceId = sequence.incrementAndGet(),
                         capturedAtEpochMs = System.currentTimeMillis(),
                         capturedAtElapsedMs = nowElapsed,
-                        sourceTimestampMicros = observations.maxOfOrNull { it.timestampMicros }?.takeIf { it > 0L },
+                        sourceTimestampMicros = newestSourceTimestampMicros,
                         requestAccepted = requestAccepted,
                         resultsUpdated = resultsUpdated,
                         likelyThrottled = false,
@@ -660,6 +669,7 @@ internal fun hasFreshScanEvidence(
     previous: ScanSnapshot?,
     observations: List<AccessPointObservation>,
     resultsUpdated: Boolean,
+    newestAcceptedSourceTimestampMicros: Long? = previous?.sourceTimestampMicros,
 ): Boolean {
     if (!resultsUpdated) return false
     if (observations.isEmpty()) {
@@ -667,8 +677,8 @@ internal fun hasFreshScanEvidence(
     }
     val newestTimestamp = observations.maxOfOrNull { it.timestampMicros }?.takeIf { it > 0L }
         ?: return false
-    val previousTimestamp = previous?.sourceTimestampMicros
-    return previousTimestamp == null || newestTimestamp > previousTimestamp
+    return newestAcceptedSourceTimestampMicros == null ||
+        newestTimestamp > newestAcceptedSourceTimestampMicros
 }
 
 private fun List<AccessPointObservation>.withConnectionMarker(

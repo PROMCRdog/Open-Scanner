@@ -112,6 +112,33 @@ class SnapshotReusePolicyTest {
         assertFalse(hasFreshScanEvidence(nonEmpty, emptyList(), resultsUpdated = false))
     }
 
+    @Test
+    fun emptyResultDoesNotLoseTheLastAcceptedTimestampWatermark() {
+        val empty = snapshot(
+            observations = emptyList(),
+            connection = connection(bssid = "old"),
+        ).copy(sourceTimestampMicros = null)
+
+        assertFalse(
+            hasFreshScanEvidence(
+                previous = empty,
+                observations = listOf(observation(id = "replayed", connected = false)),
+                resultsUpdated = true,
+                newestAcceptedSourceTimestampMicros = 1_000,
+            ),
+        )
+        assertTrue(
+            hasFreshScanEvidence(
+                previous = empty,
+                observations = listOf(
+                    observation(id = "new", connected = false).copy(timestampMicros = 2_000),
+                ),
+                resultsUpdated = true,
+                newestAcceptedSourceTimestampMicros = 1_000,
+            ),
+        )
+    }
+
     private fun observation(id: String, connected: Boolean) = AccessPointObservation(
         id = id,
         ssid = id,
