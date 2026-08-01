@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -300,6 +301,62 @@ class OpenScannerAppTest {
     }
 
     @Test
+    fun fiveSecondRefreshIsVisibleButDisabledWhileScanThrottlingIsOn() {
+        var requestedInterval: Int? = null
+        val reason = "5 s request mode requires Wi-Fi scan throttling to be OFF in Developer options."
+        showSettings(
+            state = liveState().copy(
+                capabilities = liveState().capabilities.copy(wifiScanThrottleEnabled = true),
+            ),
+            onRefreshIntervalChanged = { requestedInterval = it },
+        )
+
+        composeRule.onNodeWithText("5 s").assertIsDisplayed()
+        composeRule.onNodeWithText(reason).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("5 s option disabled. $reason").assertIsNotEnabled()
+        assertEquals(null, requestedInterval)
+    }
+
+    @Test
+    fun fiveSecondRefreshCanBeSelectedWhenScanThrottlingIsExplicitlyOff() {
+        var requestedInterval: Int? = null
+        showSettings(
+            state = liveState().copy(
+                capabilities = liveState().capabilities.copy(wifiScanThrottleEnabled = false),
+            ),
+            onRefreshIntervalChanged = { requestedInterval = it },
+        )
+
+        composeRule.onNodeWithText(
+            "5 s request mode is available. It may use more battery; fresh-result cadence still depends on Android and the device.",
+        ).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("5 s").performClick()
+        assertEquals(5, requestedInterval)
+    }
+
+    @Test
+    fun fiveSecondRefreshExplainsResolvedUnavailableThrottleState() {
+        val reason = "5 s request mode is unavailable because Android cannot report the scan-throttling state."
+        showSettings(
+            state = liveState().copy(
+                capabilities = liveState().capabilities.copy(wifiScanThrottleEnabled = null),
+            ),
+        )
+
+        composeRule.onNodeWithText(reason).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("5 s option disabled. $reason").assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsAboutUsesBuildVersion() {
+        showSettings(state = liveState())
+
+        composeRule.onNodeWithText("Version 0.2.0 · Apache License 2.0 · open source").assertIsDisplayed()
+        composeRule.onNodeWithText("About Open Scanner").performClick()
+        composeRule.onNodeWithText("Open Scanner 0.2.0").assertIsDisplayed()
+    }
+
+    @Test
     fun disablingReportRedactionRequiresExplicitConfirmation() {
         var requested: Boolean? = null
         composeRule.setContent {
@@ -381,6 +438,39 @@ class OpenScannerAppTest {
         composeRule.onNodeWithText("UNREDACTED REPORT", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("Share unredacted").performClick()
         assertTrue(shared)
+    }
+
+    private fun showSettings(
+        state: OpenScannerUiState,
+        onRefreshIntervalChanged: (Int) -> Unit = {},
+    ) {
+        composeRule.setContent {
+            OpenScannerTheme {
+                OpenScannerApp(
+                    state = state.copy(activeTab = AppTab.SETTINGS),
+                    onTabSelected = {},
+                    onChannelGroupSelected = {},
+                    onSelectNetwork = { _, _ -> },
+                    onRefresh = {},
+                    onPauseChanged = {},
+                    onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
+                    onRefreshIntervalChanged = onRefreshIntervalChanged,
+                    onResetSettings = {},
+                    onRequestPermission = {},
+                    onOpenWifiSettings = {},
+                    onOpenLocationSettings = {},
+                    onLogFieldChanged = { _, _ -> },
+                    onSetAllLogFields = {},
+                    onStartLogging = {},
+                    onStopLogging = {},
+                    onClearLog = {},
+                    buildSnapshotExport = { null },
+                    buildLogExport = { null },
+                    shareExport = {},
+                )
+            }
+        }
     }
 
     private fun liveState(): OpenScannerUiState = OpenScannerUiState(

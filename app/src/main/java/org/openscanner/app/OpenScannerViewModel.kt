@@ -37,6 +37,7 @@ import org.openscanner.core.model.ScannerState
 import org.openscanner.core.model.SignalSample
 import org.openscanner.core.model.WifiBand
 import org.openscanner.core.model.WifiChannelGroup
+import org.openscanner.core.model.WifiRefreshIntervalPolicy
 import org.openscanner.core.privacy.PrivacyRedactor
 import org.openscanner.data.settings.SettingsRepository
 import org.openscanner.data.wifi.WifiScanRepository
@@ -191,6 +192,30 @@ class OpenScannerViewModel(
             }
         }
         viewModelScope.launch {
+            combine(settingsRepository.preferences, wifiRepository.state) { preferences, scannerState ->
+                preferences.refreshIntervalSeconds to scannerState
+            }
+                .distinctUntilChangedBy { (refreshIntervalSeconds, scannerState) ->
+                    Triple(
+                        refreshIntervalSeconds,
+                        scannerState.phase,
+                        scannerState.capabilities.wifiScanThrottleEnabled,
+                    )
+                }
+                .collect { (refreshIntervalSeconds, scannerState) ->
+                    if (
+                        RefreshIntervalCapabilityPolicy.shouldResetSavedFastInterval(
+                            refreshIntervalSeconds = refreshIntervalSeconds,
+                            scannerState = scannerState,
+                        )
+                    ) {
+                        settingsRepository.setRefreshIntervalSeconds(
+                            WifiRefreshIntervalPolicy.DEFAULT_SECONDS,
+                        )
+                    }
+                }
+        }
+        viewModelScope.launch {
             while (isActive) {
                 val nowElapsed = SystemClock.elapsedRealtime()
                 val currentHistory = historyState.value
@@ -271,7 +296,11 @@ class OpenScannerViewModel(
     }
 
     fun setRefreshIntervalSeconds(seconds: Int) {
-        viewModelScope.launch { settingsRepository.setRefreshIntervalSeconds(seconds) }
+        val effectiveSeconds = WifiRefreshIntervalPolicy.effectiveSeconds(
+            seconds = seconds,
+            wifiScanThrottleEnabled = wifiRepository.state.value.capabilities.wifiScanThrottleEnabled,
+        )
+        viewModelScope.launch { settingsRepository.setRefreshIntervalSeconds(effectiveSeconds) }
     }
 
     fun resetSettings() {

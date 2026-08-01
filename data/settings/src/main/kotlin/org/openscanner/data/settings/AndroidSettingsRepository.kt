@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import org.openscanner.core.model.AppPreferences
+import org.openscanner.core.model.WifiRefreshIntervalPolicy
 
 private val Context.openScannerDataStore by preferencesDataStore(name = "open_scanner_settings")
 
@@ -27,8 +28,9 @@ class AndroidSettingsRepository(
             AppPreferences(
                 privacyMode = values[Keys.privacyMode] ?: false,
                 redactExports = values[Keys.redactExports] ?: true,
-                refreshIntervalSeconds = (values[Keys.refreshIntervalSeconds] ?: 30)
-                    .coerceIn(10, 60),
+                refreshIntervalSeconds = WifiRefreshIntervalPolicy.sanitize(
+                    values[Keys.refreshIntervalSeconds] ?: WifiRefreshIntervalPolicy.DEFAULT_SECONDS,
+                ),
             )
         }
 
@@ -41,7 +43,9 @@ class AndroidSettingsRepository(
     }
 
     override suspend fun setRefreshIntervalSeconds(seconds: Int) {
-        dataStore.edit { it[Keys.refreshIntervalSeconds] = seconds.coerceIn(10, 60) }
+        dataStore.edit {
+            it[Keys.refreshIntervalSeconds] = WifiRefreshIntervalPolicy.sanitize(seconds)
+        }
     }
 
     override suspend fun reset() {
