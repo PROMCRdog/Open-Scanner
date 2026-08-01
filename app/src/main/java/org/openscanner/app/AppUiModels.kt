@@ -11,6 +11,7 @@ import org.openscanner.core.model.SecurityType
 import org.openscanner.core.model.SignalSample
 import org.openscanner.core.model.WifiBand
 import org.openscanner.core.model.WifiChannelGroup
+import org.openscanner.core.model.WifiGeneration
 
 enum class AppTab(val label: String) {
     SCAN("Scan"),
@@ -23,7 +24,9 @@ enum class AppTab(val label: String) {
 data class NetworkUiModel(
     val uiId: String,
     val name: String,
-    val bssid: String,
+    val bssid: String?,
+    val nameKind: NetworkNameKind = NetworkNameKind.OBSERVED,
+    val privacyAliasNumber: Int? = null,
     val band: WifiBand,
     val channelGroup: WifiChannelGroup,
     val channel: Int?,
@@ -32,14 +35,21 @@ data class NetworkUiModel(
     val channelWidthMhz: Int?,
     val signalDbm: Int,
     val securityTypes: Set<SecurityType>,
-    val generation: String?,
+    val generation: WifiGeneration?,
     val connected: Boolean,
     val selected: Boolean,
 )
 
+enum class NetworkNameKind {
+    OBSERVED,
+    HIDDEN,
+    PRIVACY_ALIAS,
+}
+
 data class ConnectionUiModel(
     val connected: Boolean = false,
     val networkName: String? = null,
+    val networkNameRedacted: Boolean = false,
     val bssid: String? = null,
     val validated: Boolean? = null,
     val captivePortal: Boolean? = null,
@@ -62,7 +72,7 @@ data class NeighborhoodPostureUiModel(
     val accessPointCount: Int = 0,
     val channelGroupCounts: List<Pair<String, Int>> = emptyList(),
     val securityCounts: List<Pair<String, Int>> = emptyList(),
-    val generationCounts: List<Pair<String, Int>> = emptyList(),
+    val generationCounts: List<Pair<WifiGeneration, Int>> = emptyList(),
 )
 
 data class StabilityUiModel(
@@ -99,7 +109,12 @@ data class WifiLoggingUiState(
 data class OpenScannerUiState(
     val phase: ScannerPhase = ScannerPhase.CHECKING,
     val activeTab: AppTab = AppTab.TRACK,
-    val capabilities: PlatformCapabilities = PlatformCapabilities(true, true, false),
+    val capabilities: PlatformCapabilities = PlatformCapabilities(
+        hasWifiHardware = true,
+        supports5Ghz = true,
+        supports6Ghz = false,
+        wifiScanThrottleStateResolved = false,
+    ),
     val channelGroups: List<ChannelGroupUiModel> = emptyList(),
     val selectedChannelGroup: WifiChannelGroup = WifiChannelGroup.GHZ_5_2,
     val networks: List<NetworkUiModel> = emptyList(),

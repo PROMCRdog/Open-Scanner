@@ -3,12 +3,63 @@ package org.openscanner.data.wifi
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.openscanner.core.model.ScannerPhase
 
 class ScannerActivityGateTest {
+    @Test
+    fun foregroundAndLifecycleStateTakePrecedenceWhenResolvingThePhase() {
+        assertEquals(
+            ScannerPhase.PAUSED,
+            scannerPhaseForState(
+                receiverRegistered = false,
+                paused = false,
+                blockedPhase = ScannerPhase.PERMISSION_REQUIRED,
+                hasSnapshot = true,
+            ),
+        )
+        assertEquals(
+            ScannerPhase.PAUSED,
+            scannerPhaseForState(
+                receiverRegistered = true,
+                paused = true,
+                blockedPhase = ScannerPhase.WIFI_DISABLED,
+                hasSnapshot = true,
+            ),
+        )
+        assertEquals(
+            ScannerPhase.LOCATION_DISABLED,
+            scannerPhaseForState(
+                receiverRegistered = true,
+                paused = false,
+                blockedPhase = ScannerPhase.LOCATION_DISABLED,
+                hasSnapshot = true,
+            ),
+        )
+        assertEquals(
+            ScannerPhase.LIVE,
+            scannerPhaseForState(
+                receiverRegistered = true,
+                paused = false,
+                blockedPhase = null,
+                hasSnapshot = true,
+            ),
+        )
+        assertEquals(
+            ScannerPhase.CHECKING,
+            scannerPhaseForState(
+                receiverRegistered = true,
+                paused = false,
+                blockedPhase = null,
+                hasSnapshot = false,
+            ),
+        )
+    }
+
     @Test
     fun inactiveCoordinatorCannotStartRadioAction() {
         var invoked = false

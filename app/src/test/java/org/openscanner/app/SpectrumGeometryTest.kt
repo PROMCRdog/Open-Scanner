@@ -7,6 +7,7 @@ import org.junit.Test
 import org.openscanner.core.model.SecurityType
 import org.openscanner.core.model.WifiBand
 import org.openscanner.core.model.WifiChannelGroup
+import org.openscanner.core.model.WifiGeneration
 
 class SpectrumGeometryTest {
     @Test
@@ -172,7 +173,7 @@ class SpectrumGeometryTest {
         channelWidthMhz = widthMhz,
         signalDbm = -55,
         securityTypes = setOf(SecurityType.WPA3_PERSONAL),
-        generation = "Wi-Fi 6",
+        generation = WifiGeneration.WIFI_6,
         connected = false,
         selected = true,
     )

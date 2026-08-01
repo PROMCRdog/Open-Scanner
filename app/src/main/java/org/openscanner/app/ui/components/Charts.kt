@@ -43,6 +43,7 @@ import org.openscanner.app.spectrumFootprint
 import org.openscanner.app.spectrumXTicks
 import org.openscanner.app.spectrumYAxis
 import org.openscanner.app.ui.displayLabel
+import org.openscanner.app.ui.displayName
 import org.openscanner.app.ui.spectrumAxisTitleLabel
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
@@ -303,12 +304,14 @@ fun SpectrumChart(
     val xTicks = spectrumXTicks(channelGroup, axisStart, axisEnd)
     val widthUnknownLabel = stringResource(R.string.chart_width_unknown)
     val channelUnknownLabel = stringResource(R.string.chart_channel_unknown)
+    val displayNames = mutableMapOf<String, String>()
+    for (network in plotted) displayNames[network.uiId] = network.displayName()
     val summary = plotted.map { network ->
         val width = network.channelWidthMhz?.takeIf { it > 0 }
             ?.let { stringResource(R.string.chart_megahertz_wide, it) } ?: widthUnknownLabel
         stringResource(
             R.string.chart_network_summary,
-            network.name,
+            displayNames.getValue(network.uiId),
             network.channel?.toString() ?: channelUnknownLabel,
             network.signalDbm,
             width,
@@ -342,7 +345,7 @@ fun SpectrumChart(
                     letterSpacing = 0.8.sp,
                 )
                 Text(
-                    selected?.name ?: stringResource(R.string.chart_no_selection),
+                    selected?.let { displayNames.getValue(it.uiId) } ?: stringResource(R.string.chart_no_selection),
                     color = ScannerText,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
@@ -463,7 +466,7 @@ fun SpectrumChart(
                             val index = plotted.indexOfFirst { it.uiId == network.uiId }
                             val unknownWidth = network.channelWidthMhz?.takeIf { it > 0 } == null
                             val label = buildString {
-                                append(network.name)
+                                append(displayNames.getValue(network.uiId))
                                 if (network.selected) append(stringResource(R.string.chart_legend_suffix_selected))
                                 if (unknownWidth) append(stringResource(R.string.chart_legend_suffix_width_unknown))
                             }

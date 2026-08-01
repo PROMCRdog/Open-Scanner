@@ -53,6 +53,7 @@ import org.openscanner.app.ui.components.ChannelGroupSelector
 import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.SignalGlyph
 import org.openscanner.app.ui.displayLabel
+import org.openscanner.app.ui.displayName
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
 import org.openscanner.app.ui.theme.ScannerIconWell
@@ -73,14 +74,11 @@ fun ScanScreen(
 ) {
     var searchVisible by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val visible = state.networks
-        .asSequence()
-        .filter { it.channelGroup == state.selectedChannelGroup }
-        .filter {
-            query.isBlank() || it.name.contains(query, ignoreCase = true) ||
-                it.bssid.contains(query, ignoreCase = true)
-        }
-        .toList()
+    val visible = mutableListOf<NetworkUiModel>()
+    for (network in state.networks) {
+        if (network.channelGroup != state.selectedChannelGroup) continue
+        if (networkMatchesSearch(query, network.displayName(), network.bssid)) visible += network
+    }
     val accessPointCountNoun = stringResource(
         if (visible.size == 1) R.string.scan_access_point else R.string.scan_access_points,
     )
@@ -197,6 +195,10 @@ fun ScanScreen(
     }
 }
 
+internal fun networkMatchesSearch(query: String, displayName: String, bssid: String?): Boolean =
+    query.isBlank() || displayName.contains(query, ignoreCase = true) ||
+        bssid.orEmpty().contains(query, ignoreCase = true)
+
 @Composable
 private fun ToolbarButton(icon: ImageVector, description: String, onClick: () -> Unit) {
     IconButton(
@@ -235,6 +237,7 @@ private fun StateBadge(
 @Composable
 private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
     val rowShape = MaterialTheme.shapes.small
+    val displayName = network.displayName()
     val securityLabel = network.securityTypes.displayLabel()
     val connectionHighlight = if (network.connected) {
         Modifier
@@ -244,7 +247,7 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
         Modifier
     }
     val rowDescription = buildString {
-        append(stringResource(R.string.scan_row_description_base, network.name, network.signalDbm, network.channelGroup.displayLabel()))
+        append(stringResource(R.string.scan_row_description_base, displayName, network.signalDbm, network.channelGroup.displayLabel()))
         network.channel?.let { append(stringResource(R.string.scan_row_description_channel, it)) }
         append(stringResource(R.string.scan_row_description_security, securityLabel))
         if (network.connected) append(stringResource(R.string.scan_row_description_connected))
@@ -267,7 +270,7 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
             SignalGlyph(network.signalDbm)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
                 Text(
-                    network.name,
+                    displayName,
                     color = ScannerText,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,

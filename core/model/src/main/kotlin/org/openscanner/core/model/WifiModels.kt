@@ -1,5 +1,9 @@
 package org.openscanner.core.model
 
+/** Stable, locale-neutral sentinels used at the Android boundary and in exports. */
+const val HIDDEN_NETWORK_SSID = "Hidden network"
+const val UNAVAILABLE_BSSID = "Unavailable"
+
 enum class WifiBand(val label: String) {
     GHZ_2_4("2.4 GHz"),
     GHZ_5("5 GHz"),
@@ -67,9 +71,12 @@ data class AccessPointObservation(
     val generation: WifiGeneration,
     val timestampMicros: Long,
     val isConnected: Boolean,
+    /** True only when Android supplied no SSID; never inferred from the display text. */
+    val ssidHidden: Boolean = false,
 ) {
     override fun toString(): String =
         "AccessPointObservation(id=<redacted>, ssid=<redacted>, bssid=<redacted>, " +
+            "ssidHidden=$ssidHidden, " +
             "channel=$channel, channelWidthMhz=$channelWidthMhz, " +
             "footprintCenterFrequencyMhz=$footprintCenterFrequencyMhz, rssiDbm=$rssiDbm, " +
             "security=$security, generation=$generation, timestampMicros=$timestampMicros, " +
@@ -101,6 +108,8 @@ data class PlatformCapabilities(
     val supports6Ghz: Boolean,
     /** Persisted Developer Options state when Android exposes it; null on older/unsupported devices. */
     val wifiScanThrottleEnabled: Boolean? = null,
+    /** False only while the repository has not completed its first platform capability read. */
+    val wifiScanThrottleStateResolved: Boolean = true,
 )
 
 data class ScanSnapshot(
@@ -139,6 +148,7 @@ data class ScannerState(
         hasWifiHardware = true,
         supports5Ghz = true,
         supports6Ghz = false,
+        wifiScanThrottleStateResolved = false,
     ),
     val snapshot: ScanSnapshot? = null,
     val safeErrorCode: String? = null,

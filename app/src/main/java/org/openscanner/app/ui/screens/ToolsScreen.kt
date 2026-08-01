@@ -60,6 +60,8 @@ import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.PrimaryAction
 import org.openscanner.app.ui.displayDescription
 import org.openscanner.app.ui.displayLabel
+import org.openscanner.app.ui.displayName
+import org.openscanner.app.ui.displayNetworkName
 import org.openscanner.app.ui.theme.ScannerAmber
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
@@ -561,7 +563,7 @@ private fun dialogContent(dialog: ToolDialog, state: OpenScannerUiState): Pair<S
         stringResource(R.string.tools_security_summary_label) to if (network == null) {
             stringResource(R.string.tools_security_no_network)
         } else {
-            stringResource(R.string.tools_security_body, network.name, network.securityTypes.displayLabel())
+            stringResource(R.string.tools_security_body, network.displayName(), network.securityTypes.displayLabel())
         }
     }
     ToolDialog.NEIGHBORHOOD_POSTURE ->
@@ -607,7 +609,12 @@ private fun neighborhoodPostureDetails(state: OpenScannerUiState): String {
             ),
         )
         appendLine()
-        appendLine(section(stringResource(R.string.tools_posture_generations), posture.generationCounts))
+        appendLine(
+            section(
+                stringResource(R.string.tools_posture_generations),
+                posture.generationCounts.map { (generation, count) -> generation.displayLabel() to count },
+            ),
+        )
         appendLine()
         append(stringResource(R.string.tools_posture_footer))
     }
@@ -616,8 +623,8 @@ private fun neighborhoodPostureDetails(state: OpenScannerUiState): String {
 /**
  * Localizes a neighborhood-posture channel-group count key. Keys are the core
  * [WifiChannelGroup.label] values produced by the pure-Kotlin posture analyzer;
- * unknown keys pass through unchanged. Generation keys ("Wi-Fi 6", …) are
- * generation names and intentionally stay as-is.
+ * unknown keys pass through unchanged. Generation counts retain their enum
+ * identity and are localized separately at the display site.
  */
 @Composable
 private fun localizedPostureChannelGroupKey(key: String): String {
@@ -689,10 +696,10 @@ private fun connectionDetails(state: OpenScannerUiState): String {
                 ),
             ),
         )
-        append(stringResource(R.string.tools_connection_network, state.connection.networkName ?: unavailable))
+        append(stringResource(R.string.tools_connection_network, state.connection.displayNetworkName(unavailable)))
         append(stringResource(R.string.tools_connection_bssid, state.connection.bssid ?: unavailable))
-        append(stringResource(R.string.tools_connection_validated, state.connection.validated?.toString() ?: unavailable))
-        append(stringResource(R.string.tools_connection_captive_portal, state.connection.captivePortal?.toString() ?: unavailable))
+        append(stringResource(R.string.tools_connection_validated, state.connection.validated.displayLabel(unavailable)))
+        append(stringResource(R.string.tools_connection_captive_portal, state.connection.captivePortal.displayLabel(unavailable)))
         append(
             stringResource(
                 R.string.tools_connection_link_speed,

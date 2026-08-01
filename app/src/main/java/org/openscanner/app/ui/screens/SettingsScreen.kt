@@ -49,12 +49,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.openscanner.app.BuildConfig
 import org.openscanner.app.OpenScannerUiState
 import org.openscanner.app.R
 import org.openscanner.app.ui.components.AppHeader
@@ -68,6 +70,7 @@ import org.openscanner.app.ui.theme.ScannerSpacing
 import org.openscanner.app.ui.theme.ScannerSurface
 import org.openscanner.app.ui.theme.ScannerSurfaceRaised
 import org.openscanner.app.ui.theme.ScannerText
+import org.openscanner.core.model.WifiRefreshIntervalPolicy
 
 @Composable
 fun SettingsScreen(
@@ -122,23 +125,32 @@ fun SettingsScreen(
             detail = stringResource(R.string.settings_android_wifi_detail),
             onClick = onOpenWifiSettings,
         )
-        WifiScanThrottleStatusRow(state.capabilities.wifiScanThrottleEnabled)
+        WifiScanThrottleStatusRow(
+            enabled = state.capabilities.wifiScanThrottleEnabled,
+            resolved = state.capabilities.wifiScanThrottleStateResolved,
+        )
         SettingsRow(
             icon = Icons.Rounded.Schedule,
             label = stringResource(R.string.settings_refresh_interval_label),
-            detail = stringResource(R.string.settings_refresh_interval_detail, state.refreshIntervalSeconds),
+            detail = if (state.refreshIntervalSeconds == WifiRefreshIntervalPolicy.FAST_SECONDS) {
+                stringResource(R.string.settings_refresh_interval_fast_detail)
+            } else {
+                stringResource(R.string.settings_refresh_interval_detail, state.refreshIntervalSeconds)
+            },
             onClick = {},
             trailing = null,
         )
         RefreshIntervalSelector(
             selectedSeconds = state.refreshIntervalSeconds,
+            wifiScanThrottleEnabled = state.capabilities.wifiScanThrottleEnabled,
+            throttleStatusChecking = !state.capabilities.wifiScanThrottleStateResolved,
             onSelect = onRefreshIntervalChanged,
         )
         SectionLabel(stringResource(R.string.settings_section_project))
         SettingsRow(
             icon = Icons.Rounded.Info,
             label = stringResource(R.string.settings_about_label),
-            detail = stringResource(R.string.settings_about_detail),
+            detail = stringResource(R.string.settings_about_detail, BuildConfig.VERSION_NAME),
             onClick = { aboutOpen = true },
         )
         SettingsRow(
@@ -151,7 +163,7 @@ fun SettingsScreen(
 
     if (aboutOpen) {
         SettingsAlertDialog(
-            title = stringResource(R.string.settings_about_dialog_title),
+            title = stringResource(R.string.settings_about_dialog_title, BuildConfig.VERSION_NAME),
             onDismiss = { aboutOpen = false },
             icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
             text = {
@@ -253,53 +265,79 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun RefreshIntervalSelector(
     selectedSeconds: Int,
+    wifiScanThrottleEnabled: Boolean?,
+    throttleStatusChecking: Boolean,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val options = listOf(10, 15, 30, 60)
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(ScannerSpacing.MinTouchTarget)
-            .border(1.dp, ScannerBorder, MaterialTheme.shapes.small),
+    val fastModeNote = when {
+        wifiScanThrottleEnabled == false -> stringResource(R.string.settings_refresh_fast_available)
+        wifiScanThrottleEnabled == true -> stringResource(R.string.settings_refresh_fast_requires_throttling_off)
+        throttleStatusChecking -> stringResource(R.string.settings_refresh_fast_checking)
+        else -> stringResource(R.string.settings_refresh_fast_unavailable)
+    }
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm),
     ) {
-        options.forEachIndexed { index, seconds ->
-            val selected = seconds == selectedSeconds
-            val interactionSource = remember { MutableInteractionSource() }
-            val intervalLabel = stringResource(R.string.settings_refresh_interval_seconds, seconds)
-            val segmentContentDescription = if (selected) {
-                stringResource(R.string.settings_refresh_interval_seconds_selected, seconds)
-            } else {
-                intervalLabel
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(if (selected) ScannerCyan else ScannerSurface)
-                    .clickable(
-                        role = Role.RadioButton,
-                        interactionSource = interactionSource,
-                        indication = null,
-                    ) { onSelect(seconds) }
-                    .semantics {
-                        this.selected = selected
-                        role = Role.RadioButton
-                        contentDescription = segmentContentDescription
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    intervalLabel,
-                    color = if (selected) ScannerOnCyan else ScannerMuted,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                )
-            }
-            if (index != options.lastIndex) {
-                Box(Modifier.width(1.dp).fillMaxHeight().background(ScannerBorder))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(ScannerSpacing.MinTouchTarget)
+                .border(1.dp, ScannerBorder, MaterialTheme.shapes.small),
+        ) {
+            WifiRefreshIntervalPolicy.SUPPORTED_SECONDS.forEachIndexed { index, seconds ->
+                val selected = seconds == selectedSeconds
+                val enabled = WifiRefreshIntervalPolicy.isSelectable(seconds, wifiScanThrottleEnabled)
+                val interactionSource = remember { MutableInteractionSource() }
+                val intervalLabel = stringResource(R.string.settings_refresh_interval_seconds, seconds)
+                val segmentContentDescription = when {
+                    seconds == WifiRefreshIntervalPolicy.FAST_SECONDS && !enabled ->
+                        stringResource(R.string.settings_refresh_interval_fast_disabled_cd, fastModeNote)
+                    selected -> stringResource(R.string.settings_refresh_interval_seconds_selected, seconds)
+                    else -> intervalLabel
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(if (selected) ScannerCyan else ScannerSurface)
+                        .clickable(
+                            enabled = enabled,
+                            role = Role.RadioButton,
+                            interactionSource = interactionSource,
+                            indication = null,
+                        ) { onSelect(seconds) }
+                        .semantics {
+                            this.selected = selected
+                            role = Role.RadioButton
+                            contentDescription = segmentContentDescription
+                            if (!enabled) disabled()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        intervalLabel,
+                        color = when {
+                            selected -> ScannerOnCyan
+                            enabled -> ScannerMuted
+                            else -> ScannerMuted.copy(alpha = 0.5f)
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
+                if (index != WifiRefreshIntervalPolicy.SUPPORTED_SECONDS.lastIndex) {
+                    Box(Modifier.width(1.dp).fillMaxHeight().background(ScannerBorder))
+                }
             }
         }
+        Text(
+            text = fastModeNote,
+            color = if (wifiScanThrottleEnabled == false) ScannerCyan else ScannerMuted,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = ScannerSpacing.Sm),
+        )
     }
 }
 
@@ -337,21 +375,24 @@ private fun ToggleRow(
 }
 
 @Composable
-private fun WifiScanThrottleStatusRow(enabled: Boolean?) {
-    val status = when (enabled) {
-        true -> stringResource(R.string.settings_status_on)
-        false -> stringResource(R.string.settings_status_off)
-        null -> stringResource(R.string.settings_status_na)
+private fun WifiScanThrottleStatusRow(enabled: Boolean?, resolved: Boolean) {
+    val status = when {
+        !resolved -> stringResource(R.string.settings_status_checking)
+        enabled == true -> stringResource(R.string.settings_status_on)
+        enabled == false -> stringResource(R.string.settings_status_off)
+        else -> stringResource(R.string.settings_status_na)
     }
-    val statusColor = when (enabled) {
-        true -> ScannerAmber
-        false -> ScannerCyan
-        null -> ScannerMuted
+    val statusColor = when {
+        !resolved -> ScannerMuted
+        enabled == true -> ScannerAmber
+        enabled == false -> ScannerCyan
+        else -> ScannerMuted
     }
-    val detail = when (enabled) {
-        true -> stringResource(R.string.settings_wifi_scan_throttling_detail_on)
-        false -> stringResource(R.string.settings_wifi_scan_throttling_detail_off)
-        null -> stringResource(R.string.settings_wifi_scan_throttling_detail_unavailable)
+    val detail = when {
+        !resolved -> stringResource(R.string.settings_wifi_scan_throttling_detail_checking)
+        enabled == true -> stringResource(R.string.settings_wifi_scan_throttling_detail_on)
+        enabled == false -> stringResource(R.string.settings_wifi_scan_throttling_detail_off)
+        else -> stringResource(R.string.settings_wifi_scan_throttling_detail_unavailable)
     }
     val throttleLabel = stringResource(R.string.settings_wifi_scan_throttling_label)
     val rowContentDescription = stringResource(R.string.settings_wifi_scan_throttling_cd, status, detail)

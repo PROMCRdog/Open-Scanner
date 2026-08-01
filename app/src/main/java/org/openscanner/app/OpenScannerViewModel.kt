@@ -35,8 +35,11 @@ import org.openscanner.core.model.AccessPointObservation
 import org.openscanner.core.model.AppPreferences
 import org.openscanner.core.model.ScannerState
 import org.openscanner.core.model.SignalSample
+import org.openscanner.core.model.UNAVAILABLE_BSSID
 import org.openscanner.core.model.WifiBand
 import org.openscanner.core.model.WifiChannelGroup
+import org.openscanner.core.model.WifiGeneration
+import org.openscanner.core.model.WifiRefreshIntervalPolicy
 import org.openscanner.core.privacy.PrivacyRedactor
 import org.openscanner.data.settings.SettingsRepository
 import org.openscanner.data.wifi.WifiScanRepository
@@ -191,6 +194,30 @@ class OpenScannerViewModel(
             }
         }
         viewModelScope.launch {
+            combine(settingsRepository.preferences, wifiRepository.state) { preferences, scannerState ->
+                preferences.refreshIntervalSeconds to scannerState
+            }
+                .distinctUntilChangedBy { (refreshIntervalSeconds, scannerState) ->
+                    Triple(
+                        refreshIntervalSeconds,
+                        scannerState.capabilities.wifiScanThrottleEnabled,
+                        scannerState.capabilities.wifiScanThrottleStateResolved,
+                    )
+                }
+                .collect { (refreshIntervalSeconds, scannerState) ->
+                    if (
+                        RefreshIntervalCapabilityPolicy.shouldResetSavedFastInterval(
+                            refreshIntervalSeconds = refreshIntervalSeconds,
+                            scannerState = scannerState,
+                        )
+                    ) {
+                        settingsRepository.setRefreshIntervalSeconds(
+                            WifiRefreshIntervalPolicy.DEFAULT_SECONDS,
+                        )
+                    }
+                }
+        }
+        viewModelScope.launch {
             while (isActive) {
                 val nowElapsed = SystemClock.elapsedRealtime()
                 val currentHistory = historyState.value
@@ -271,7 +298,11 @@ class OpenScannerViewModel(
     }
 
     fun setRefreshIntervalSeconds(seconds: Int) {
-        viewModelScope.launch { settingsRepository.setRefreshIntervalSeconds(seconds) }
+        val effectiveSeconds = WifiRefreshIntervalPolicy.effectiveSeconds(
+            seconds = seconds,
+            wifiScanThrottleEnabled = wifiRepository.state.value.capabilities.wifiScanThrottleEnabled,
+        )
+        viewModelScope.launch { settingsRepository.setRefreshIntervalSeconds(effectiveSeconds) }
     }
 
     fun resetSettings() {
@@ -433,6 +464,7 @@ class OpenScannerViewModel(
             connection = ConnectionUiModel(
                 connected = displayedConnection?.connected == true,
                 networkName = displayedConnection?.ssid,
+                networkNameRedacted = preferences.privacyMode && displayedConnection?.ssid != null,
                 bssid = displayedConnection?.bssid,
                 validated = displayedConnection?.validated,
                 captivePortal = displayedConnection?.captivePortal,
@@ -460,7 +492,7 @@ class OpenScannerViewModel(
                 generationCounts = posture.generations.entries
                     .sortedWith(compareByDescending<Map.Entry<org.openscanner.core.model.WifiGeneration, Int>> { it.value }
                         .thenBy { it.key.name })
-                    .map { it.key.label to it.value },
+                    .map { it.key to it.value },
             ),
             privacyMode = preferences.privacyMode,
             redactExports = preferences.redactExports,
@@ -496,7 +528,9 @@ class OpenScannerViewModel(
         return NetworkUiModel(
             uiId = opaqueId(id),
             name = displayed.ssid,
-            bssid = displayed.bssid,
+            bssid = displayed.bssid.takeUnless { this.bssid == UNAVAILABLE_BSSID },
+            nameKind = networkNameKind(privacyMode, ssidHidden),
+            privacyAliasNumber = aliasNumber.takeIf { privacyMode },
             band = channel.band,
             channelGroup = WifiChannelMapper.group(channel),
             channel = channel.number,
@@ -505,7 +539,7 @@ class OpenScannerViewModel(
             channelWidthMhz = channelWidthMhz,
             signalDbm = rssiDbm,
             securityTypes = security,
-            generation = generation.label.takeUnless { it == "Unknown" },
+            generation = generation.takeUnless { it == WifiGeneration.UNKNOWN },
             connected = isConnected,
             selected = selected,
         )
@@ -526,4 +560,10 @@ class OpenScannerViewModel(
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             OpenScannerViewModel(wifiRepository, settingsRepository) as T
     }
+}
+
+internal fun networkNameKind(privacyMode: Boolean, ssidHidden: Boolean): NetworkNameKind = when {
+    privacyMode -> NetworkNameKind.PRIVACY_ALIAS
+    ssidHidden -> NetworkNameKind.HIDDEN
+    else -> NetworkNameKind.OBSERVED
 }
