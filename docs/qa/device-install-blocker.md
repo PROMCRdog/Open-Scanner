@@ -17,4 +17,6 @@ INSTALL_FAILED_USER_RESTRICTED: Install canceled by user
 
 Read-only checks showed developer options enabled, unknown-source install enabled, and no effective device-policy install restriction for the primary user. The remaining likely gate is Xiaomi/HyperOS's separate **Install via USB** developer setting or an equivalent device-side confirmation.
 
-No security setting was changed or bypassed. Native physical UI/runtime verification remains pending until the device owner enables that standard install path. Private device captures remain under the ignored `research/private-captures/` directory.
+No security setting was changed or bypassed. Native physical UI/runtime verification on this specific Xiaomi device remains pending until the device owner enables that standard install path. Private device captures remain under the ignored `research/private-captures/` directory.
+
+Update: a later signed RC installed and passed bounded runtime/instrumentation checks on a different physical device. Under [ADR 0003](../adr/0003-early-public-release-policy.md), the Xiaomi-specific install restriction is a documented compatibility exception rather than a blocker for the early public release.

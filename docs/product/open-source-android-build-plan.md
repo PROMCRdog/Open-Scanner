@@ -272,7 +272,7 @@ Profile before adding caches; every cache has an owner, bound, invalidation rule
 
 Every-change CI runs static analysis, JVM tests, debug/instrumentation builds, privacy scan, release build, benchmark smoke test, and notices/SBOM; nightly adds full API 26/29/33/36 devices, API 37 when its compatible SDK image is available, and reproducibility audits.
 Pin the wrapper checksum, JDK, Android SDK/build tools, plugins, dependencies, and CI image; enable dependency verification/locking and archive the graph, CycloneDX SBOM, mapping, checksums, and build manifest.
-Build unsigned artifacts twice in clean offline containers with the same `SOURCE_DATE_EPOCH`; byte differences block release for diffoscope analysis.
+For compatibility certification, build unsigned artifacts twice in clean offline containers with the same `SOURCE_DATE_EPOCH`; byte differences block certification for diffoscope analysis. An early public release instead publishes and independently rechecks the exact signed artifact hash, certificate, signature schemes, and source revision while recording the reproducibility audit as pending.
 Then sign and publish signed/unsigned checksums, source tag, toolchain manifest, and verification instructions. Release only from a clean signed tag with no secrets, private identifiers, screenshots, machine paths, or `local.properties`.
 
 License original code/docs under Apache-2.0 and retain third-party notices. Allow Apache-2.0/MIT/BSD/ISC dependencies by default; copyleft or unavailable source needs a recorded legal/architecture decision.
@@ -318,9 +318,11 @@ Record 30-minute foreground and paused/background Perfetto/Battery Historian run
 The installed manifest must lack Internet/LAN/background-location/storage/VPN/notification/usage permissions; external capture must find no app network traffic.
 Manually run TalkBack through every action and chart summary; automation supplements but never replaces this pass.
 
-Release is blocked unless unit/instrumentation/benchmark/privacy tests pass, budgets pass, two physical-device classes pass, and known OEM exceptions are documented.
+[ADR 0003](../adr/0003-early-public-release-policy.md) defines two assurance levels. An early public release requires green automated build/privacy gates, permanent signing, exact-artifact verification, one authorized physical-device install/cold-launch with the critical report-privacy flows, documented exceptions, and explicit maintainer risk acceptance. A known critical privacy/security defect, unexpected permission or network access, failed build/test gate, signing mismatch, or private-data leak still blocks publication.
+
+The full matrix above remains required for compatibility certification: benchmark budgets, two or more supported physical-device classes, manual accessibility, permission/radio states, external traffic capture, upgrade/migration, and reproducibility. Incomplete certification work must remain visible and cannot be claimed as passed, but it does not block an explicitly scoped early release.
 README, in-app Help, permissions table, threat model, algorithms, screenshots, notices, SBOM, and observable behavior must agree.
-The signed release must install over the prior version, migrate data, delete all local data correctly, reproduce from the source tag, and match published checksums.
+Compatibility certification also requires the signed release to install over the prior version, migrate data, delete all local data correctly, reproduce from the source tag, and match published checksums. The early-release artifact must at minimum match its published checksum and embedded source revision exactly.
 
 ## 20. v0.1.0 definition
 
@@ -345,4 +347,4 @@ Saved sessions, tracker/survey, OUI, widgets, notifications, active/LAN tools, R
 | Modular build becomes slow or ceremonial | keep interfaces narrow, use convention plugins, measure configuration time, merge modules only with evidence |
 | Open-source release leaks test-environment networks | synthetic fixtures only, repository secret/identifier scan, clean-source release rehearsal |
 
-Implementation may begin only after the visual gate; release may occur only after the connected-device, privacy, performance, accessibility, and reproducibility gates all pass.
+Implementation may begin only after the visual gate. Early publication follows [ADR 0003](../adr/0003-early-public-release-policy.md)'s hard source, automated-test, privacy, signing, artifact-integrity, bounded-device, disclosure, and maintainer-approval gates; broad compatibility certification occurs only after the connected-device, performance, accessibility, and reproducibility matrix passes.

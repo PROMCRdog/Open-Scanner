@@ -44,7 +44,7 @@ This proposal is an independent product cut derived only from the reference feat
 - Privacy redaction occurs before rendering, persistence, logging, export, or bug-report attachment by default; raw reports require explicit opt-in and exact-preview confirmation.
 - Raw SSIDs, BSSIDs, IPs, and scan results never enter analytics, crash reports, or network requests.
 - The app remains useful when permissions are denied; each unavailable feature explains why and offers the relevant system action.
-- Accessibility semantics, 48 dp targets, color-independent encoding, scalable text, and reduced motion are release gates.
+- Accessibility semantics, 48 dp targets, color-independent encoding, scalable text, and reduced motion are implementation requirements and compatibility-certification gates. A known critical accessibility regression remains an early-release blocker.
 - Consequential actions use persistent confirmation; transient messages report completed actions only.
 - The app does not save WiFi passwords or attempt to bypass Android-owned connection and security flows.
 
@@ -206,9 +206,9 @@ This proposal is an independent product cut derived only from the reference feat
 | External AI/widgets claims | Widget is post-MVP and stale-aware; unexplained AI analysis is excluded. |
 | Missing accessibility names/small targets | Make semantic labels, state announcements, and minimum target sizing release-blocking. |
 
-## MVP release gate
+## MVP validation levels
 
-The MVP is ready only when all of the following are demonstrated on supported stock devices:
+[ADR 0003](../adr/0003-early-public-release-policy.md) permits an explicitly scoped early public release after the hard automated, privacy, signing, exact-artifact, bounded-device, disclosure, and maintainer-approval gates pass. Full MVP compatibility certification is complete only when all of the following are demonstrated on supported stock devices:
 
 - Every screen renders the same snapshot ID, capture time, and freshness state for a given scan.
 - Permission denied, location dependency, WiFi off, unsupported band, no results, throttled, stale, and paused states are separately testable.
