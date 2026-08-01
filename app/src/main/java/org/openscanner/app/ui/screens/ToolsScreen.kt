@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -52,10 +53,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.openscanner.app.R
 import org.openscanner.app.OpenScannerUiState
 import org.openscanner.app.ui.components.AppHeader
 import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.PrimaryAction
+import org.openscanner.app.ui.displayDescription
+import org.openscanner.app.ui.displayLabel
 import org.openscanner.app.ui.theme.ScannerAmber
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
@@ -72,6 +76,8 @@ import org.openscanner.core.export.WifiLogFormat
 import org.openscanner.core.export.WifiLogRecorder
 import org.openscanner.core.export.WifiLogStopReason
 import org.openscanner.core.model.ScannerPhase
+import org.openscanner.core.model.SecurityType
+import org.openscanner.core.model.WifiChannelGroup
 
 @Composable
 fun ToolsScreen(
@@ -92,20 +98,20 @@ fun ToolsScreen(
     var replaceLogConfirm by remember { mutableStateOf(false) }
     var clearLogConfirm by remember { mutableStateOf(false) }
     val status = when {
-        state.phase == ScannerPhase.PAUSED -> "Scanning is paused; connection evidence is from the last snapshot"
-        state.phase != ScannerPhase.LIVE -> "Current connection evidence is unavailable until scanning recovers"
-        !state.connection.connected -> "No active Wi-Fi connection reported"
-        state.connection.captivePortal == true -> "Captive portal sign-in may be required"
-        state.connection.validated == true -> "Android reports this Wi-Fi connection as validated"
-        state.connection.validated == false -> "Android has not validated internet access"
-        else -> "Wi-Fi is connected; validation state is unavailable"
+        state.phase == ScannerPhase.PAUSED -> stringResource(R.string.tools_status_paused)
+        state.phase != ScannerPhase.LIVE -> stringResource(R.string.tools_status_scan_unavailable)
+        !state.connection.connected -> stringResource(R.string.tools_status_no_connection)
+        state.connection.captivePortal == true -> stringResource(R.string.tools_status_captive_portal)
+        state.connection.validated == true -> stringResource(R.string.tools_status_validated)
+        state.connection.validated == false -> stringResource(R.string.tools_status_not_validated)
+        else -> stringResource(R.string.tools_status_validation_unavailable)
     }
 
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Md),
     ) {
-        AppHeader(eyebrow = "Local-only diagnostics", phase = state.phase, freshness = state.freshness)
+        AppHeader(eyebrow = stringResource(R.string.tools_eyebrow), phase = state.phase, freshness = state.freshness)
         InformationBanner(
             icon = if (state.phase == ScannerPhase.LIVE && state.connection.connected) {
                 Icons.Rounded.WifiTethering
@@ -128,29 +134,29 @@ fun ToolsScreen(
         Column(Modifier.fillMaxWidth()) {
             ToolRow(
                 icon = Icons.Rounded.WifiTethering,
-                label = "Connection evidence",
-                detail = "Android validation, link speed and local addressing",
+                label = stringResource(R.string.tools_connection_evidence_label),
+                detail = stringResource(R.string.tools_connection_evidence_detail),
             ) { dialog = ToolDialog.CONNECTION }
             ToolRow(
                 icon = Icons.Rounded.Security,
-                label = "Security summary",
-                detail = "Encryption class and passive risk signals",
+                label = stringResource(R.string.tools_security_summary_label),
+                detail = stringResource(R.string.tools_security_summary_detail),
             ) { dialog = ToolDialog.SECURITY }
             ToolRow(
                 icon = Icons.Rounded.Info,
-                label = "Neighborhood posture",
-                detail = "Observed counts by channel group, security, and Wi-Fi generation",
+                label = stringResource(R.string.tools_neighborhood_posture_label),
+                detail = stringResource(R.string.tools_neighborhood_posture_detail),
             ) { dialog = ToolDialog.NEIGHBORHOOD_POSTURE }
             ToolRow(
                 icon = Icons.Rounded.Share,
-                label = "Export current snapshot",
+                label = stringResource(R.string.tools_export_snapshot_label),
                 detail = if (state.snapshotSequence == null) {
-                    "A completed scan is required before export"
+                    stringResource(R.string.tools_export_snapshot_requires_scan)
                 } else {
                     if (state.redactExports) {
-                        "Preview redacted JSON or CSV before sharing"
+                        stringResource(R.string.tools_export_snapshot_redacted)
                     } else {
-                        "Preview UNREDACTED JSON or CSV before sharing"
+                        stringResource(R.string.tools_export_snapshot_unredacted)
                     }
                 },
             ) {
@@ -158,13 +164,13 @@ fun ToolsScreen(
             }
             ToolRow(
                 icon = Icons.Rounded.Description,
-                label = "Measurement limits",
-                detail = "Scan throttling, RSSI and channel evidence explained",
+                label = stringResource(R.string.tools_measurement_limits_label),
+                detail = stringResource(R.string.tools_measurement_limits_detail),
             ) { dialog = ToolDialog.MEASUREMENT_LIMITS }
         }
         InformationBanner(
             icon = Icons.Rounded.Lock,
-            text = "No account, ads, telemetry, or Internet permission. Diagnostics and logging run on-device.",
+            text = stringResource(R.string.tools_privacy_banner),
             modifier = Modifier.padding(top = ScannerSpacing.Sm),
         )
     }
@@ -174,19 +180,19 @@ fun ToolsScreen(
         ToolAlertDialog(
             title = title,
             onDismiss = { dialog = null },
-            confirmButton = { TextButton(onClick = { dialog = null }) { Text("Done") } },
+            confirmButton = { TextButton(onClick = { dialog = null }) { Text(stringResource(R.string.tools_done)) } },
             text = { Text(body, style = MaterialTheme.typography.bodyMedium) },
         )
     }
     if (snapshotExportChooser) {
         FormatChooserDialog(
-            title = "Choose snapshot format",
+            title = stringResource(R.string.tools_choose_snapshot_format),
             explanation = if (state.redactExports) {
-                "A redacted preview is shown before a temporary file is shared."
+                stringResource(R.string.tools_snapshot_format_redacted)
             } else {
-                "The preview is UNREDACTED and may contain sensitive network identifiers and local addresses."
+                stringResource(R.string.tools_snapshot_format_unredacted)
             },
-            labels = ExportFormat.entries.map { it.label },
+            labels = ExportFormat.entries.map { it.displayLabel() },
             onChoose = { index ->
                 snapshotExportChooser = false
                 onPrepareSnapshotExport(ExportFormat.entries[index])
@@ -196,13 +202,13 @@ fun ToolsScreen(
     }
     if (logExportChooser) {
         FormatChooserDialog(
-            title = "Choose log format",
+            title = stringResource(R.string.tools_choose_log_format),
             explanation = if (state.logging.redacted == false) {
-                "Text is human-readable; JSON and CSV are structured. The exact preview is UNREDACTED."
+                stringResource(R.string.tools_log_format_unredacted)
             } else {
-                "Text is human-readable; JSON and CSV are structured. The preview is the exact redacted payload."
+                stringResource(R.string.tools_log_format_redacted)
             },
-            labels = WifiLogFormat.entries.map { it.label },
+            labels = WifiLogFormat.entries.map { it.displayLabel() },
             onChoose = { index ->
                 logExportChooser = false
                 onPrepareLogExport(WifiLogFormat.entries[index])
@@ -221,20 +227,20 @@ fun ToolsScreen(
     }
     if (replaceLogConfirm) {
         ToolAlertDialog(
-            title = "Replace the previous log?",
+            title = stringResource(R.string.tools_replace_log_title),
             onDismiss = { replaceLogConfirm = false },
             confirmButton = {
                 TextButton(onClick = {
                     replaceLogConfirm = false
                     onStartLogging()
-                }) { Text("Replace and start", color = ScannerAmber) }
+                }) { Text(stringResource(R.string.tools_replace_and_start), color = ScannerAmber) }
             },
             dismissButton = {
-                TextButton(onClick = { replaceLogConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { replaceLogConfirm = false }) { Text(stringResource(R.string.tools_cancel)) }
             },
             text = {
                 Text(
-                    "The memory-only session will be replaced. Export it first if you want to keep it.",
+                    stringResource(R.string.tools_replace_log_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -242,19 +248,19 @@ fun ToolsScreen(
     }
     if (clearLogConfirm) {
         ToolAlertDialog(
-            title = "Clear the Wi-Fi log?",
+            title = stringResource(R.string.tools_clear_log_title),
             onDismiss = { clearLogConfirm = false },
             confirmButton = {
                 TextButton(onClick = {
                     clearLogConfirm = false
                     onClearLog()
-                }) { Text("Clear", color = ScannerAmber) }
+                }) { Text(stringResource(R.string.tools_clear), color = ScannerAmber) }
             },
             dismissButton = {
-                TextButton(onClick = { clearLogConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { clearLogConfirm = false }) { Text(stringResource(R.string.tools_cancel)) }
             },
             text = {
-                Text("This removes the stopped session from memory.", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.tools_clear_log_body), style = MaterialTheme.typography.bodyMedium)
             },
         )
     }
@@ -271,10 +277,10 @@ private fun WifiLoggingPanel(
 ) {
     val logging = state.logging
     val status = when {
-        logging.active -> "RECORDING"
-        logging.stopReason == WifiLogStopReason.SAFETY_LIMIT -> "LIMIT REACHED"
-        logging.hasSession -> "READY TO EXPORT"
-        else -> "NOT STARTED"
+        logging.active -> stringResource(R.string.tools_log_status_recording)
+        logging.stopReason == WifiLogStopReason.SAFETY_LIMIT -> stringResource(R.string.tools_log_status_limit_reached)
+        logging.hasSession -> stringResource(R.string.tools_log_status_ready_to_export)
+        else -> stringResource(R.string.tools_log_status_not_started)
     }
     Column(
         modifier = Modifier
@@ -290,17 +296,29 @@ private fun WifiLoggingPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Wi-Fi session log", color = ScannerText, style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.tools_log_title), color = ScannerText, style = MaterialTheme.typography.titleLarge)
                 Text(
                     if (logging.active) {
-                        "${logging.recordedFields.size} logged fields · " +
-                            if (logging.redacted == false) "UNREDACTED" else "identifiers redacted"
+                        if (logging.redacted == false) {
+                            stringResource(R.string.tools_log_fields_active_unredacted, logging.recordedFields.size)
+                        } else {
+                            stringResource(R.string.tools_log_fields_active_redacted, logging.recordedFields.size)
+                        }
                     } else if (logging.hasSession) {
-                        "${logging.recordedFields.size} logged fields · " +
-                            "${if (logging.redacted == false) "UNREDACTED" else "redacted"} session · " +
-                            "${logging.selectedFields.size} selected for next session"
+                        stringResource(
+                            R.string.tools_log_fields_session,
+                            logging.recordedFields.size,
+                            stringResource(
+                                if (logging.redacted == false) R.string.tools_unredacted else R.string.tools_redacted,
+                            ),
+                            logging.selectedFields.size,
+                        )
                     } else {
-                        "${logging.selectedFields.size} of ${WifiLogField.entries.size} fields selected"
+                        stringResource(
+                            R.string.tools_log_fields_selected,
+                            logging.selectedFields.size,
+                            WifiLogField.entries.size,
+                        )
                     },
                     color = ScannerMuted,
                     style = MaterialTheme.typography.bodySmall,
@@ -315,26 +333,32 @@ private fun WifiLoggingPanel(
         }
         if (logging.hasSession) {
             Text(
-                "${logging.recordCount} records · ${logging.networkRowCount} AP rows · ${formatDuration(logging.durationMs)}",
+                stringResource(
+                    R.string.tools_log_records,
+                    logging.recordCount,
+                    logging.networkRowCount,
+                    formatDuration(logging.durationMs),
+                ),
                 color = ScannerText,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
         Text(
             if (logging.active) {
-                "Field selection and report redaction are locked for this session. Logging records scanner " +
-                    "changes and periodic foreground samples at the requested refresh cadence; Android may reuse evidence."
+                stringResource(R.string.tools_log_description_active)
             } else {
-                "Choose fields, then start. The session stays in memory until cleared or the app process ends; stop it before export. " +
-                    "The next session will be ${if (state.redactExports) "redacted" else "UNREDACTED"}. " +
-                    "Safety limit: ${WifiLogRecorder.MAX_RECORDS} records or " +
-                    "${WifiLogRecorder.MAX_NETWORK_ROWS} AP rows."
+                stringResource(
+                    R.string.tools_log_description_inactive,
+                    stringResource(if (state.redactExports) R.string.tools_redacted else R.string.tools_unredacted),
+                    WifiLogRecorder.MAX_RECORDS,
+                    WifiLogRecorder.MAX_NETWORK_ROWS,
+                )
             },
             color = ScannerMuted,
             style = MaterialTheme.typography.bodySmall,
         )
         PrimaryAction(
-            label = if (logging.active) "Stop logging" else "Start logging",
+            label = stringResource(if (logging.active) R.string.tools_stop_logging else R.string.tools_start_logging),
             onClick = if (logging.active) onStop else onStart,
             enabled = logging.active || (logging.canStart && state.snapshotSequence != null),
         )
@@ -348,7 +372,7 @@ private fun WifiLoggingPanel(
                 modifier = Modifier.heightIn(min = ScannerSpacing.MinTouchTarget),
             ) {
                 Icon(Icons.Rounded.Settings, contentDescription = null)
-                Text("Fields", modifier = Modifier.padding(start = ScannerSpacing.Xs))
+                Text(stringResource(R.string.tools_fields), modifier = Modifier.padding(start = ScannerSpacing.Xs))
             }
             TextButton(
                 onClick = onExport,
@@ -356,7 +380,7 @@ private fun WifiLoggingPanel(
                 modifier = Modifier.heightIn(min = ScannerSpacing.MinTouchTarget),
             ) {
                 Icon(Icons.Rounded.Share, contentDescription = null)
-                Text("Export", modifier = Modifier.padding(start = ScannerSpacing.Xs))
+                Text(stringResource(R.string.tools_export), modifier = Modifier.padding(start = ScannerSpacing.Xs))
             }
             TextButton(
                 onClick = onClear,
@@ -364,18 +388,18 @@ private fun WifiLoggingPanel(
                 modifier = Modifier.heightIn(min = ScannerSpacing.MinTouchTarget),
             ) {
                 Icon(Icons.Rounded.Delete, contentDescription = null)
-                Text("Clear", modifier = Modifier.padding(start = ScannerSpacing.Xs))
+                Text(stringResource(R.string.tools_clear), modifier = Modifier.padding(start = ScannerSpacing.Xs))
             }
         }
         if (!logging.active && state.snapshotSequence == null) {
             Text(
-                "Complete a scan before starting a log.",
+                stringResource(R.string.tools_log_need_scan),
                 color = ScannerAmber,
                 style = MaterialTheme.typography.labelMedium,
             )
         } else if (!logging.active && !logging.canStart) {
             Text(
-                "Select at least one field before starting.",
+                stringResource(R.string.tools_log_need_fields),
                 color = ScannerAmber,
                 style = MaterialTheme.typography.labelMedium,
             )
@@ -392,22 +416,24 @@ private fun LogFieldChooser(
     onDismiss: () -> Unit,
 ) {
     ToolAlertDialog(
-        title = "Logging fields",
+        title = stringResource(R.string.tools_logging_fields_title),
         onDismiss = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.tools_done)) } },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm)) {
                 Text(
-                    if (redacted) {
-                        "Record number and elapsed time are always included. Sensitive identifiers are masked."
-                    } else {
-                        "Record number and elapsed time are always included. The next session will retain selected raw identifiers in memory."
-                    },
+                    stringResource(
+                        if (redacted) {
+                            R.string.tools_logging_fields_hint_redacted
+                        } else {
+                            R.string.tools_logging_fields_hint_unredacted
+                        },
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(onClick = { onSetAll(true) }) { Text("Select all") }
-                    TextButton(onClick = { onSetAll(false) }) { Text("Clear all") }
+                    TextButton(onClick = { onSetAll(true) }) { Text(stringResource(R.string.tools_select_all)) }
+                    TextButton(onClick = { onSetAll(false) }) { Text(stringResource(R.string.tools_clear_all)) }
                 }
                 LazyColumn(
                     modifier = Modifier
@@ -418,7 +444,7 @@ private fun LogFieldChooser(
                     WifiLogFieldCategory.entries.forEach { category ->
                         item(key = "header-${category.name}") {
                             Text(
-                                category.label.uppercase(),
+                                category.displayLabel().uppercase(),
                                 color = ScannerCyan,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.padding(
@@ -433,6 +459,8 @@ private fun LogFieldChooser(
                             items = WifiLogField.entries.filter { it.category == category },
                             key = { it.name },
                         ) { field ->
+                            val fieldLabel = field.displayLabel()
+                            val fieldDescription = field.displayDescription()
                             val checked = field in selected
                             Row(
                                 modifier = Modifier
@@ -443,7 +471,7 @@ private fun LogFieldChooser(
                                         role = Role.Checkbox,
                                         onValueChange = { onFieldChanged(field, it) },
                                     )
-                                    .semantics { contentDescription = "${field.label}. ${field.description}" }
+                                    .semantics { contentDescription = "$fieldLabel. $fieldDescription" }
                                     .padding(horizontal = ScannerSpacing.Md, vertical = ScannerSpacing.Sm),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -453,8 +481,8 @@ private fun LogFieldChooser(
                                     colors = CheckboxDefaults.colors(checkedColor = ScannerCyan),
                                 )
                                 Column(Modifier.weight(1f).padding(start = ScannerSpacing.Sm)) {
-                                    Text(field.label, color = ScannerText, style = MaterialTheme.typography.bodyMedium)
-                                    Text(field.description, color = ScannerMuted, style = MaterialTheme.typography.labelSmall)
+                                    Text(fieldLabel, color = ScannerText, style = MaterialTheme.typography.bodyMedium)
+                                    Text(fieldDescription, color = ScannerMuted, style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                             HorizontalDivider(color = ScannerBorder)
@@ -477,7 +505,7 @@ private fun FormatChooserDialog(
     ToolAlertDialog(
         title = title,
         onDismiss = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.tools_cancel)) } },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm)) {
                 Text(explanation, style = MaterialTheme.typography.bodyMedium)
@@ -525,51 +553,87 @@ private enum class ToolDialog {
     MEASUREMENT_LIMITS,
 }
 
+@Composable
 private fun dialogContent(dialog: ToolDialog, state: OpenScannerUiState): Pair<String, String> = when (dialog) {
-    ToolDialog.CONNECTION -> "Connection evidence" to connectionDetails(state)
+    ToolDialog.CONNECTION -> stringResource(R.string.tools_connection_evidence_label) to connectionDetails(state)
     ToolDialog.SECURITY -> {
         val network = state.selectedNetwork
-        "Security summary" to if (network == null) {
-            "Select an access point to inspect its advertised security capabilities."
+        stringResource(R.string.tools_security_summary_label) to if (network == null) {
+            stringResource(R.string.tools_security_no_network)
         } else {
-            "${network.name}\n\nAdvertised security: ${network.security}.\n\n" +
-                "This describes beacon capabilities only. It does not audit passwords, router firmware, or client isolation."
+            stringResource(R.string.tools_security_body, network.name, network.securityTypes.displayLabel())
         }
     }
-    ToolDialog.NEIGHBORHOOD_POSTURE -> "Neighborhood posture" to neighborhoodPostureDetails(state)
-    ToolDialog.NO_SNAPSHOT -> "No snapshot to export" to
-        "Complete a nearby Wi-Fi scan first. Open Scanner will then build an exact " +
-        "${if (state.redactExports) "redacted" else "UNREDACTED"} preview before sharing anything."
-    ToolDialog.MEASUREMENT_LIMITS -> "Measurement limits" to
-        "Open Scanner uses passive Android scan results. Android may cache or throttle scans. " +
-        "RSSI is not distance or throughput, and channel overlap is not airtime utilization. " +
-        "The app therefore reports freshness and observed evidence without guaranteeing the best legal router channel."
+    ToolDialog.NEIGHBORHOOD_POSTURE ->
+        stringResource(R.string.tools_neighborhood_posture_label) to neighborhoodPostureDetails(state)
+    ToolDialog.NO_SNAPSHOT -> stringResource(R.string.tools_no_snapshot_title) to
+        stringResource(
+            R.string.tools_no_snapshot_body,
+            stringResource(if (state.redactExports) R.string.tools_redacted else R.string.tools_unredacted),
+        )
+    ToolDialog.MEASUREMENT_LIMITS -> stringResource(R.string.tools_measurement_limits_label) to
+        stringResource(R.string.tools_measurement_limits_body)
 }
 
+@Composable
 private fun neighborhoodPostureDetails(state: OpenScannerUiState): String {
     val posture = state.neighborhoodPosture
     if (state.snapshotSequence == null) {
-        return "Complete a scan to summarize the currently observed neighborhood."
+        return stringResource(R.string.tools_posture_need_scan)
     }
+    val unavailable = stringResource(R.string.tools_unavailable)
     fun section(title: String, values: List<Pair<String, Int>>): String = buildString {
         appendLine(title)
         if (values.isEmpty()) {
-            append("  Unavailable")
+            append("  $unavailable")
         } else {
             append(values.joinToString("\n") { (label, count) -> "  $label: $count" })
         }
     }
     return buildString {
-        appendLine("Observed access points: ${posture.accessPointCount}")
+        appendLine(stringResource(R.string.tools_posture_observed_aps, posture.accessPointCount))
         appendLine()
-        appendLine(section("Channel groups", posture.channelGroupCounts))
+        appendLine(
+            section(
+                stringResource(R.string.tools_posture_channel_groups),
+                posture.channelGroupCounts.map { (key, count) -> localizedPostureChannelGroupKey(key) to count },
+            ),
+        )
         appendLine()
-        appendLine(section("Advertised security profiles", posture.securityCounts))
+        appendLine(
+            section(
+                stringResource(R.string.tools_posture_security_profiles),
+                posture.securityCounts.map { (key, count) -> localizedPostureSecurityKey(key) to count },
+            ),
+        )
         appendLine()
-        appendLine(section("Wi-Fi generations", posture.generationCounts))
+        appendLine(section(stringResource(R.string.tools_posture_generations), posture.generationCounts))
         appendLine()
-        append("Counts describe this snapshot only; they do not identify devices, measure airtime, or rate safety.")
+        append(stringResource(R.string.tools_posture_footer))
     }
+}
+
+/**
+ * Localizes a neighborhood-posture channel-group count key. Keys are the core
+ * [WifiChannelGroup.label] values produced by the pure-Kotlin posture analyzer;
+ * unknown keys pass through unchanged. Generation keys ("Wi-Fi 6", …) are
+ * generation names and intentionally stay as-is.
+ */
+@Composable
+private fun localizedPostureChannelGroupKey(key: String): String {
+    val localizedByLabel = WifiChannelGroup.entries.associate { it.label to it.displayLabel() }
+    return localizedByLabel[key] ?: key
+}
+
+/**
+ * Localizes a neighborhood-posture security-profile count key. Keys are core
+ * [SecurityType.label] values joined with " + " by the posture analyzer, so
+ * each part is mapped independently; unknown parts pass through unchanged.
+ */
+@Composable
+private fun localizedPostureSecurityKey(key: String): String {
+    val localizedByLabel = SecurityType.entries.associate { it.label to it.displayLabel() }
+    return key.split(" + ").joinToString(" + ") { localizedByLabel[it] ?: it }
 }
 
 @Composable
@@ -607,23 +671,46 @@ private fun ToolRow(icon: ImageVector, label: String, detail: String, onClick: (
     HorizontalDivider(color = ScannerBorder)
 }
 
-private fun connectionDetails(state: OpenScannerUiState): String = if (state.phase !in setOf(ScannerPhase.LIVE, ScannerPhase.PAUSED)) {
-    "Current connection evidence is withheld while scanning is unavailable so an older snapshot is not presented as current. Recover scanning, then open this panel again."
-} else buildString {
-    if (state.phase == ScannerPhase.PAUSED) {
-        append("Evidence status: last snapshot before pause; values may now be stale.\n\n")
+@Composable
+private fun connectionDetails(state: OpenScannerUiState): String {
+    val unavailable = stringResource(R.string.tools_unavailable)
+    if (state.phase !in setOf(ScannerPhase.LIVE, ScannerPhase.PAUSED)) {
+        return stringResource(R.string.tools_connection_withheld)
     }
-    append("Connection: ${if (state.connection.connected) "Wi-Fi" else "Not connected over Wi-Fi"}\n")
-    append("Network: ${state.connection.networkName ?: "Unavailable"}\n")
-    append("BSSID: ${state.connection.bssid ?: "Unavailable"}\n")
-    append("Android validated: ${state.connection.validated?.toString() ?: "Unavailable"}\n")
-    append("Captive portal: ${state.connection.captivePortal?.toString() ?: "Unavailable"}\n")
-    append("Link speed: ${state.connection.linkSpeedMbps?.let { "$it Mbps" } ?: "Unavailable"}\n")
-    append("RX / TX: ${state.connection.rxLinkSpeedMbps ?: "—"} / ${state.connection.txLinkSpeedMbps ?: "—"} Mbps\n")
-    append("IP address: ${state.connection.ipAddress ?: "Unavailable"}\n")
-    append("Gateway: ${state.connection.gateway ?: "Unavailable"}\n")
-    append("DNS: ${state.connection.dnsServers.ifEmpty { listOf("Unavailable") }.joinToString()}\n\n")
-    append("No external endpoint was contacted.")
+    return buildString {
+        if (state.phase == ScannerPhase.PAUSED) {
+            append(stringResource(R.string.tools_connection_evidence_stale))
+        }
+        append(
+            stringResource(
+                R.string.tools_connection_label,
+                stringResource(
+                    if (state.connection.connected) R.string.tools_connection_wifi else R.string.tools_connection_not_connected,
+                ),
+            ),
+        )
+        append(stringResource(R.string.tools_connection_network, state.connection.networkName ?: unavailable))
+        append(stringResource(R.string.tools_connection_bssid, state.connection.bssid ?: unavailable))
+        append(stringResource(R.string.tools_connection_validated, state.connection.validated?.toString() ?: unavailable))
+        append(stringResource(R.string.tools_connection_captive_portal, state.connection.captivePortal?.toString() ?: unavailable))
+        append(
+            stringResource(
+                R.string.tools_connection_link_speed,
+                state.connection.linkSpeedMbps?.let { stringResource(R.string.tools_connection_mbps, it) } ?: unavailable,
+            ),
+        )
+        append(
+            stringResource(
+                R.string.tools_connection_rx_tx,
+                state.connection.rxLinkSpeedMbps ?: "—",
+                state.connection.txLinkSpeedMbps ?: "—",
+            ),
+        )
+        append(stringResource(R.string.tools_connection_ip, state.connection.ipAddress ?: unavailable))
+        append(stringResource(R.string.tools_connection_gateway, state.connection.gateway ?: unavailable))
+        append(stringResource(R.string.tools_connection_dns, state.connection.dnsServers.ifEmpty { listOf(unavailable) }.joinToString()))
+        append(stringResource(R.string.tools_connection_no_external))
+    }
 }
 
 private fun formatDuration(durationMs: Long): String {

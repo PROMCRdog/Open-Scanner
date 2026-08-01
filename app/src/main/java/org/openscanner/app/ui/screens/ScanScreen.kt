@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -46,10 +47,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.openscanner.app.NetworkUiModel
 import org.openscanner.app.OpenScannerUiState
+import org.openscanner.app.R
 import org.openscanner.app.ui.components.AppHeader
 import org.openscanner.app.ui.components.ChannelGroupSelector
 import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.SignalGlyph
+import org.openscanner.app.ui.displayLabel
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
 import org.openscanner.app.ui.theme.ScannerIconWell
@@ -78,11 +81,18 @@ fun ScanScreen(
                 it.bssid.contains(query, ignoreCase = true)
         }
         .toList()
-    val accessPointCountNoun = if (visible.size == 1) "access point" else "access points"
+    val accessPointCountNoun = stringResource(
+        if (visible.size == 1) R.string.scan_access_point else R.string.scan_access_points,
+    )
 
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Md)) {
         AppHeader(
-            eyebrow = "${visible.size} $accessPointCountNoun · ${state.selectedChannelGroup.label}",
+            eyebrow = stringResource(
+                R.string.scan_header_eyebrow,
+                visible.size,
+                accessPointCountNoun,
+                state.selectedChannelGroup.displayLabel(),
+            ),
             phase = state.phase,
             freshness = state.freshness,
         )
@@ -96,7 +106,7 @@ fun ScanScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Nearby networks", color = ScannerText, style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.scan_nearby_networks), color = ScannerText, style = MaterialTheme.typography.titleLarge)
                 Text(
                     ageLabel(state.ageMs, state.likelyThrottled),
                     color = ScannerMuted,
@@ -104,10 +114,10 @@ fun ScanScreen(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm)) {
-                ToolbarButton(Icons.Rounded.Refresh, "Refresh scan", onRefresh)
+                ToolbarButton(Icons.Rounded.Refresh, stringResource(R.string.scan_refresh_scan), onRefresh)
                 ToolbarButton(
                     if (searchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
-                    if (searchVisible) "Close search" else "Search networks",
+                    stringResource(if (searchVisible) R.string.scan_close_search else R.string.scan_search_networks),
                 ) {
                     searchVisible = !searchVisible
                     if (!searchVisible) query = ""
@@ -122,7 +132,7 @@ fun ScanScreen(
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge,
                 shape = MaterialTheme.shapes.small,
-                label = { Text("SSID or BSSID") },
+                label = { Text(stringResource(R.string.scan_search_hint)) },
                 leadingIcon = { Icon(Icons.Rounded.FilterList, contentDescription = null) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = ScannerText,
@@ -155,14 +165,14 @@ fun ScanScreen(
                     )
                 }
                 Text(
-                    "No ${state.selectedChannelGroup.label} networks in this snapshot",
+                    stringResource(R.string.scan_empty_title, state.selectedChannelGroup.displayLabel()),
                     color = ScannerText,
                     style = MaterialTheme.typography.headlineSmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = ScannerSpacing.Lg),
                 )
                 Text(
-                    "Try another band or request a refresh. Android may return cached results.",
+                    stringResource(R.string.scan_empty_subtitle),
                     color = ScannerMuted,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
@@ -180,11 +190,9 @@ fun ScanScreen(
         }
         InformationBanner(
             icon = Icons.Rounded.Lock,
-            text = if (state.privacyMode) {
-                "Privacy mode is masking network names and addresses on screen."
-            } else {
-                "Identifiers stay on this device and are redacted from exports by default."
-            },
+            text = stringResource(
+                if (state.privacyMode) R.string.scan_privacy_banner_on else R.string.scan_privacy_banner_off,
+            ),
         )
     }
 }
@@ -227,12 +235,20 @@ private fun StateBadge(
 @Composable
 private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
     val rowShape = MaterialTheme.shapes.small
+    val securityLabel = network.securityTypes.displayLabel()
     val connectionHighlight = if (network.connected) {
         Modifier
             .background(ScannerIconWell, rowShape)
             .border(1.dp, ScannerCyan, rowShape)
     } else {
         Modifier
+    }
+    val rowDescription = buildString {
+        append(stringResource(R.string.scan_row_description_base, network.name, network.signalDbm, network.channelGroup.displayLabel()))
+        network.channel?.let { append(stringResource(R.string.scan_row_description_channel, it)) }
+        append(stringResource(R.string.scan_row_description_security, securityLabel))
+        if (network.connected) append(stringResource(R.string.scan_row_description_connected))
+        if (network.selected) append(stringResource(R.string.scan_row_description_selected))
     }
     Column {
         Row(
@@ -242,13 +258,7 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
                 .clickable(role = Role.Button, onClick = onClick)
                 .semantics {
                     role = Role.Button
-                    contentDescription = buildString {
-                        append("${network.name}, ${network.signalDbm} dBm, ${network.channelGroup.label}")
-                        network.channel?.let { append(", channel $it") }
-                        append(", ${network.security}")
-                        if (network.connected) append(", current system Wi-Fi connection")
-                        if (network.selected) append(", selected for tracking")
-                    }
+                    contentDescription = rowDescription
                 }
                 .padding(horizontal = ScannerSpacing.Xs, vertical = ScannerSpacing.Md),
             verticalAlignment = Alignment.CenterVertically,
@@ -268,14 +278,14 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm),
                 ) {
                     if (network.connected) {
-                        StateBadge("CURRENT WI-FI", emphasized = true)
+                        StateBadge(stringResource(R.string.scan_badge_current_wifi), emphasized = true)
                     }
                     Text(
                         buildString {
-                            append(network.channelGroup.label)
-                            network.channel?.let { append(" · Ch $it") }
-                            network.channelWidthMhz?.let { append(" · ${it} MHz") }
-                            append(" · ${network.security}")
+                            append(network.channelGroup.displayLabel())
+                            network.channel?.let { append(stringResource(R.string.scan_row_channel, it)) }
+                            network.channelWidthMhz?.let { append(stringResource(R.string.scan_row_width, it)) }
+                            append(stringResource(R.string.scan_row_security, securityLabel))
                         },
                         color = ScannerMuted,
                         style = MaterialTheme.typography.bodySmall,
@@ -296,14 +306,14 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
                         style = MaterialTheme.typography.titleLarge,
                     )
                     Text(
-                        " dBm",
+                        stringResource(R.string.scan_dbm_unit),
                         color = ScannerMuted,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(start = ScannerSpacing.Xs),
                     )
                 }
                 if (network.selected) {
-                    StateBadge("TRACKING")
+                    StateBadge(stringResource(R.string.scan_badge_tracking))
                 }
             }
         }
@@ -311,12 +321,13 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
     }
 }
 
+@Composable
 private fun ageLabel(ageMs: Long?, likelyThrottled: Boolean): String {
     val age = when {
-        ageMs == null -> "Waiting for scan"
-        ageMs < 1_000L -> "Updated just now"
-        ageMs < 60_000L -> "Updated ${ageMs / 1_000L}s ago"
-        else -> "Updated ${ageMs / 60_000L}m ago"
+        ageMs == null -> stringResource(R.string.scan_age_waiting)
+        ageMs < 1_000L -> stringResource(R.string.scan_age_just_now)
+        ageMs < 60_000L -> stringResource(R.string.scan_age_seconds, ageMs / 1_000L)
+        else -> stringResource(R.string.scan_age_minutes, ageMs / 60_000L)
     }
-    return if (likelyThrottled) "$age · cached results likely" else age
+    return if (likelyThrottled) stringResource(R.string.scan_age_cached, age) else age
 }

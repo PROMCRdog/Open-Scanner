@@ -100,8 +100,9 @@ internal data class SignalHistoryTimeTick(
 /**
  * Computes time-axis ticks at sensible round steps (15s/30s/1m/2m/5m/10m/15m/
  * 30m/1h, then whole hours) so the axis always carries at most [maxTicks]
- * labels. The first tick is always "Now" (offset 0) and the last tick always
- * lands exactly on the window start so the full span stays labeled.
+ * labels. The first tick is always [nowLabel] (offset 0) and the last tick
+ * always lands exactly on the window start so the full span stays labeled.
+ * Composable display sites should pass a localized [nowLabel].
  *
  * Labels are drawn centered on their ticks, so adjacent ticks must keep some
  * clearance: when the window start would land closer than half the step to the
@@ -112,9 +113,10 @@ internal data class SignalHistoryTimeTick(
 internal fun signalHistoryTimeTicks(
     spanMs: Long,
     maxTicks: Int = 5,
+    nowLabel: String = "Now",
 ): List<SignalHistoryTimeTick> {
     if (spanMs <= 0L || maxTicks < 2) {
-        return listOf(SignalHistoryTimeTick(offsetFromEndMs = 0L, label = "Now"))
+        return listOf(SignalHistoryTimeTick(offsetFromEndMs = 0L, label = nowLabel))
     }
     val candidates = listOf(
         15_000L, 30_000L, 60_000L, 120_000L, 300_000L,
@@ -136,14 +138,18 @@ internal fun signalHistoryTimeTicks(
     return offsets.map { offset ->
         SignalHistoryTimeTick(
             offsetFromEndMs = offset,
-            label = if (offset == 0L) "Now" else "-${compactDurationLabel(offset)}",
+            label = if (offset == 0L) nowLabel else "-${compactDurationLabel(offset)}",
         )
     }
 }
 
-/** Compact duration label shared by axis ticks and stale-state readouts. */
-internal fun compactDurationLabel(durationMs: Long): String = when {
-    durationMs <= 0L -> "Start"
+/**
+ * Compact duration label shared by axis ticks and stale-state readouts. The
+ * unit suffixes (s/m/h) are locale-neutral SI-style abbreviations; only the
+ * zero/negative-duration word is localizable, via [startLabel].
+ */
+internal fun compactDurationLabel(durationMs: Long, startLabel: String = "Start"): String = when {
+    durationMs <= 0L -> startLabel
     durationMs < 60_000L -> "${(durationMs / 1_000L).coerceAtLeast(1L)}s"
     durationMs % 3_600_000L == 0L -> "${durationMs / 3_600_000L}h"
     durationMs % 60_000L == 0L -> "${durationMs / 60_000L}m"

@@ -18,6 +18,7 @@ import org.openscanner.core.domain.Freshness
 import org.openscanner.core.export.ExportDocument
 import org.openscanner.core.model.PlatformCapabilities
 import org.openscanner.core.model.ScannerPhase
+import org.openscanner.core.model.SecurityType
 import org.openscanner.core.model.WifiBand
 import org.openscanner.core.model.WifiChannelGroup
 
@@ -405,7 +406,7 @@ class OpenScannerAppTest {
                 footprintCenterFrequencyMhz = 5210,
                 channelWidthMhz = 80,
                 signalDbm = -52,
-                security = "WPA3 Personal",
+                securityTypes = setOf(SecurityType.WPA3_PERSONAL),
                 generation = "Wi-Fi 6",
                 connected = true,
                 selected = true,
@@ -422,7 +423,7 @@ class OpenScannerAppTest {
             footprintCenterFrequencyMhz = 5210,
             channelWidthMhz = 80,
             signalDbm = -52,
-            security = "WPA3 Personal",
+            securityTypes = setOf(SecurityType.WPA3_PERSONAL),
             generation = "Wi-Fi 6",
             connected = true,
             selected = true,

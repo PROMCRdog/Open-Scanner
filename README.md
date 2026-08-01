@@ -1,5 +1,7 @@
 # Open Scanner
 
+English | [简体中文](README.zh-CN.md)
+
 [![CI](https://github.com/PROMCRdog/Open-Scanner/actions/workflows/ci.yml/badge.svg)](https://github.com/PROMCRdog/Open-Scanner/actions/workflows/ci.yml)
 
 Open Scanner is a local-first, open-source Wi-Fi analysis toolkit for Android. It turns Android's passive scan results into a clear five-tab workflow: **Scan**, **Track**, **Spectrum**, **Tools**, and **Settings**.

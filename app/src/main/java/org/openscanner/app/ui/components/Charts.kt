@@ -22,6 +22,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.drawText
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.openscanner.app.NetworkUiModel
+import org.openscanner.app.R
 import org.openscanner.app.compactDurationLabel
 import org.openscanner.app.normalizedSpectrumHalfSpan
 import org.openscanner.app.signalHistoryTimeTicks
@@ -38,9 +40,10 @@ import org.openscanner.app.signalHistoryWindow
 import org.openscanner.app.signalHistoryYAxis
 import org.openscanner.app.spectrumAxisRangeMhz
 import org.openscanner.app.spectrumFootprint
-import org.openscanner.app.spectrumXAxisTitle
 import org.openscanner.app.spectrumXTicks
 import org.openscanner.app.spectrumYAxis
+import org.openscanner.app.ui.displayLabel
+import org.openscanner.app.ui.spectrumAxisTitleLabel
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
 import org.openscanner.app.ui.theme.ScannerGreen
@@ -78,18 +81,45 @@ fun SignalHistoryChart(
     val maximum = values.maxOfOrNull { it.rssiDbm } ?: latestDbm
     val window = signalHistoryWindow(values, nowElapsedMs)
     val yAxis = signalHistoryYAxis(values, latestDbm)
-    val timeTicks = signalHistoryTimeTicks(window.spanMs)
+    val durationStartLabel = stringResource(R.string.geo_duration_start)
+    val timeTicks = signalHistoryTimeTicks(
+        window.spanMs,
+        nowLabel = stringResource(R.string.geo_now),
+    )
     val stale = values.isNotEmpty() && window.staleTailMs >= StaleTailThresholdMs
-    val durationLabel = if (values.isEmpty()) "No history" else compactDurationLabel(window.spanMs)
-    val axisDescription = "Axis ${yAxis.minDbm} to ${yAxis.maxDbm} dBm in ${yAxis.stepDbm} dB steps."
+    val durationLabel = if (values.isEmpty()) {
+        stringResource(R.string.chart_no_history)
+    } else {
+        compactDurationLabel(window.spanMs, startLabel = durationStartLabel)
+    }
+    val axisDescription = stringResource(
+        R.string.chart_axis_description,
+        yAxis.minDbm,
+        yAxis.maxDbm,
+        yAxis.stepDbm,
+    )
+    val staleTailLabel = compactDurationLabel(window.staleTailMs, startLabel = durationStartLabel)
     val description = when {
-        values.isEmpty() -> "Signal history. No retained history samples. $axisDescription"
-        stale ->
-            "Signal history over $durationLabel. Last sample ${compactDurationLabel(window.staleTailMs)} ago; " +
-                "stale region shaded. Latest $latestDbm dBm, minimum $minimum dBm, maximum $maximum dBm, " +
-                "${values.size} samples. $axisDescription"
-        else -> "Signal history over $durationLabel. Latest sample now. Latest $latestDbm dBm, " +
-            "minimum $minimum dBm, maximum $maximum dBm, ${values.size} samples. $axisDescription"
+        values.isEmpty() -> stringResource(R.string.chart_history_description_empty, axisDescription)
+        stale -> stringResource(
+            R.string.chart_history_description_stale,
+            durationLabel,
+            staleTailLabel,
+            latestDbm,
+            minimum,
+            maximum,
+            values.size,
+            axisDescription,
+        )
+        else -> stringResource(
+            R.string.chart_history_description_current,
+            durationLabel,
+            latestDbm,
+            minimum,
+            maximum,
+            values.size,
+            axisDescription,
+        )
     }
     Column(
         modifier = modifier
@@ -105,10 +135,14 @@ fun SignalHistoryChart(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Signal (dBm)", color = ScannerMuted, style = MaterialTheme.typography.labelMedium)
+            Text(
+                stringResource(R.string.chart_signal_dbm_axis),
+                color = ScannerMuted,
+                style = MaterialTheme.typography.labelMedium,
+            )
             if (stale) {
                 Text(
-                    "Stale — last sample ${compactDurationLabel(window.staleTailMs)} ago",
+                    stringResource(R.string.chart_stale_last_sample, staleTailLabel),
                     color = ScannerOrange,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -200,7 +234,7 @@ fun SignalHistoryChart(
             }
             if (values.isEmpty()) {
                 Text(
-                    "No retained history",
+                    stringResource(R.string.chart_no_retained_history),
                     color = ScannerMuted,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.align(Alignment.Center),
@@ -208,7 +242,7 @@ fun SignalHistoryChart(
             }
         }
         Text(
-            "Time",
+            stringResource(R.string.chart_time_axis),
             color = ScannerMuted,
             style = MaterialTheme.typography.labelMedium,
             textAlign = TextAlign.Center,
@@ -221,13 +255,22 @@ fun SignalHistoryChart(
             horizontalArrangement = Arrangement.spacedBy(ScannerSpacing.Lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ChartLegendEntry(swatch = LegendSwatch.Line, color = ScannerCyan, label = "Signal", emphasized = true)
-            ChartLegendEntry(swatch = LegendSwatch.Dot, color = ScannerCyan, label = "Latest value")
+            ChartLegendEntry(
+                swatch = LegendSwatch.Line,
+                color = ScannerCyan,
+                label = stringResource(R.string.chart_legend_signal),
+                emphasized = true,
+            )
+            ChartLegendEntry(
+                swatch = LegendSwatch.Dot,
+                color = ScannerCyan,
+                label = stringResource(R.string.chart_legend_latest_value),
+            )
             if (stale) {
                 ChartLegendEntry(
                     swatch = LegendSwatch.StaleRegion,
                     color = ScannerOrange,
-                    label = "Stale gap",
+                    label = stringResource(R.string.chart_legend_stale_gap),
                 )
             }
         }
@@ -258,18 +301,33 @@ fun SpectrumChart(
     val (axisStart, axisEnd) = spectrumAxisRangeMhz(channelGroup, observedFootprintEdges)
     val yAxis = spectrumYAxis()
     val xTicks = spectrumXTicks(channelGroup, axisStart, axisEnd)
-    val summary = plotted.joinToString { network ->
-        val width = network.channelWidthMhz?.takeIf { it > 0 }?.let { "$it megahertz wide" } ?: "width unknown"
-        "${network.name}, channel ${network.channel ?: "unknown"}, ${network.signalDbm} dBm, $width"
-    }
+    val widthUnknownLabel = stringResource(R.string.chart_width_unknown)
+    val channelUnknownLabel = stringResource(R.string.chart_channel_unknown)
+    val summary = plotted.map { network ->
+        val width = network.channelWidthMhz?.takeIf { it > 0 }
+            ?.let { stringResource(R.string.chart_megahertz_wide, it) } ?: widthUnknownLabel
+        stringResource(
+            R.string.chart_network_summary,
+            network.name,
+            network.channel?.toString() ?: channelUnknownLabel,
+            network.signalDbm,
+            width,
+        )
+    }.joinToString()
+    val overlapDescription = stringResource(
+        R.string.chart_overlap_description,
+        channelGroup.displayLabel(),
+        yAxis.minDbm,
+        yAxis.maxDbm,
+        summary,
+    )
     Column(
         modifier = modifier
             .fillMaxWidth()
             .border(1.dp, ScannerBorder, MaterialTheme.shapes.small)
             .background(ScannerSurface)
             .semantics {
-                contentDescription = "${channelGroup.label} channel overlap chart. " +
-                    "Signal axis ${yAxis.minDbm} to ${yAxis.maxDbm} dBm. $summary"
+                contentDescription = overlapDescription
             },
     ) {
         Row(
@@ -277,9 +335,14 @@ fun SpectrumChart(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("SELECTED", color = ScannerMuted, style = MaterialTheme.typography.labelSmall, letterSpacing = 0.8.sp)
                 Text(
-                    selected?.name ?: "No selection",
+                    stringResource(R.string.chart_selected_label),
+                    color = ScannerMuted,
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 0.8.sp,
+                )
+                Text(
+                    selected?.name ?: stringResource(R.string.chart_no_selection),
                     color = ScannerText,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
@@ -287,7 +350,12 @@ fun SpectrumChart(
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("SIGNAL", color = ScannerMuted, style = MaterialTheme.typography.labelSmall, letterSpacing = 0.8.sp)
+                Text(
+                    stringResource(R.string.chart_signal_label),
+                    color = ScannerMuted,
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 0.8.sp,
+                )
                 Text(
                     selected?.let { "${it.signalDbm} dBm" } ?: "—",
                     color = ScannerText,
@@ -296,7 +364,7 @@ fun SpectrumChart(
             }
         }
         Text(
-            "Signal (dBm)",
+            stringResource(R.string.chart_signal_dbm_axis),
             color = ScannerMuted,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.padding(start = 14.dp),
@@ -376,7 +444,7 @@ fun SpectrumChart(
             }
         }
         Text(
-            spectrumXAxisTitle(channelGroup),
+            channelGroup.spectrumAxisTitleLabel(),
             color = ScannerMuted,
             style = MaterialTheme.typography.labelMedium,
             textAlign = TextAlign.Center,
@@ -396,8 +464,8 @@ fun SpectrumChart(
                             val unknownWidth = network.channelWidthMhz?.takeIf { it > 0 } == null
                             val label = buildString {
                                 append(network.name)
-                                if (network.selected) append(" · selected")
-                                if (unknownWidth) append(" · width unknown")
+                                if (network.selected) append(stringResource(R.string.chart_legend_suffix_selected))
+                                if (unknownWidth) append(stringResource(R.string.chart_legend_suffix_width_unknown))
                             }
                             ChartLegendEntry(
                                 swatch = if (unknownWidth) LegendSwatch.UnknownWidth else LegendSwatch.Line,

@@ -28,14 +28,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.openscanner.app.OpenScannerUiState
+import org.openscanner.app.R
 import org.openscanner.app.ui.components.AppHeader
 import org.openscanner.app.ui.components.ChannelGroupSelector
 import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.PrimaryAction
 import org.openscanner.app.ui.components.SpectrumChart
+import org.openscanner.app.ui.displayLabel
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
 import org.openscanner.app.ui.theme.ScannerMuted
@@ -59,7 +63,7 @@ fun SpectrumScreen(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Md),
     ) {
-        AppHeader(eyebrow = "Channel spectrum", phase = state.phase, freshness = state.freshness)
+        AppHeader(eyebrow = stringResource(R.string.spectrum_channel_spectrum), phase = state.phase, freshness = state.freshness)
         ChannelGroupSelector(
             state.channelGroups,
             state.selectedChannelGroup,
@@ -68,13 +72,13 @@ fun SpectrumScreen(
         if (state.selectedChannelGroup == WifiChannelGroup.GHZ_5_5_DFS) {
             InformationBanner(
                 icon = Icons.Rounded.Info,
-                text = "DFS names this observed channel range only. Open Scanner does not determine regulatory availability or router usability.",
+                text = stringResource(R.string.spectrum_dfs_banner),
             )
         }
         if (chartNetworks.isEmpty()) {
             InformationBanner(
                 icon = Icons.Rounded.Info,
-                text = "No ${state.selectedChannelGroup.label} observations are available in this snapshot.",
+                text = stringResource(R.string.spectrum_no_observations, state.selectedChannelGroup.displayLabel()),
             )
         } else {
             SpectrumChart(state.selectedChannelGroup, chartNetworks)
@@ -87,32 +91,35 @@ fun SpectrumScreen(
                 verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm),
             ) {
                 Text(
-                    text = "Selected access point",
+                    text = stringResource(R.string.spectrum_selected_access_point),
                     color = ScannerMuted,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                    SummaryCell("Channel", selected?.channel?.toString() ?: "—", Modifier.weight(1f))
+                    SummaryCell(stringResource(R.string.spectrum_channel), selected?.channel?.toString() ?: "—", Modifier.weight(1f))
                     Box(Modifier.width(1.dp).fillMaxHeight().background(ScannerBorder))
-                    SummaryCell("Signal", selected?.let { "${it.signalDbm} dBm" } ?: "—", Modifier.weight(1f))
+                    SummaryCell(stringResource(R.string.spectrum_signal), selected?.let { stringResource(R.string.spectrum_signal_dbm, it.signalDbm) } ?: "—", Modifier.weight(1f))
                     Box(Modifier.width(1.dp).fillMaxHeight().background(ScannerBorder))
-                    SummaryCell("Overlap", state.congestion.level.label, Modifier.weight(1f))
+                    SummaryCell(stringResource(R.string.spectrum_overlap), state.congestion.level.displayLabel(), Modifier.weight(1f))
                 }
             }
             if (analysisVisible) {
                 InformationBanner(
                     icon = Icons.Rounded.CheckCircle,
-                    text = buildString {
-                        append("Observed overlap is ${state.congestion.level.label.lowercase()}. ")
-                        append("${state.congestion.overlappingNetworks} overlapping network")
-                        if (state.congestion.overlappingNetworks != 1) append('s')
-                        append("; ${state.congestion.coChannelNetworks} co-channel. ")
-                        append("This is passive evidence, not a regulatory channel recommendation.")
-                    },
+                    text = stringResource(
+                        R.string.spectrum_overlap_analysis,
+                        state.congestion.level.displayLabel().lowercase(),
+                        pluralStringResource(
+                            R.plurals.spectrum_overlapping_networks,
+                            state.congestion.overlappingNetworks,
+                            state.congestion.overlappingNetworks,
+                        ),
+                        state.congestion.coChannelNetworks,
+                    ),
                     positive = state.congestion.level != org.openscanner.core.domain.ObservedCongestion.HIGH,
                 )
             }
-            PrimaryAction("Analyze observed interference", onClick = { analysisVisible = true })
+            PrimaryAction(stringResource(R.string.spectrum_analyze_interference), onClick = { analysisVisible = true })
         }
     }
 }

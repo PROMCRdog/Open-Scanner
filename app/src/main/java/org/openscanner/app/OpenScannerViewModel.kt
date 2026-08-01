@@ -409,7 +409,6 @@ class OpenScannerViewModel(
             ChannelGroupUiModel(
                 group = group,
                 enabled = supported || observed,
-                unavailableReason = if (supported || observed) null else "Not reported by this device",
             )
         }
 
@@ -423,7 +422,7 @@ class OpenScannerViewModel(
             selectedNetwork = uiNetworks.firstOrNull { it.selected },
             signalHistory = selected?.id?.let { controls.history.signals[it] }.orEmpty(),
             selectedStability = StabilityUiModel(
-                label = stability.level.label,
+                level = stability.level,
                 assessedSnapshots = stability.assessedSnapshots,
                 presentSnapshots = stability.presentSnapshots,
                 absentPercent = stability.absentShare?.times(100.0)?.roundToInt(),
@@ -505,7 +504,7 @@ class OpenScannerViewModel(
             footprintCenterFrequencyMhz = footprintCenterFrequencyMhz,
             channelWidthMhz = channelWidthMhz,
             signalDbm = rssiDbm,
-            security = security.joinToString(" + ") { it.label },
+            securityTypes = security,
             generation = generation.label.takeUnless { it == "Unknown" },
             connected = isConnected,
             selected = selected,

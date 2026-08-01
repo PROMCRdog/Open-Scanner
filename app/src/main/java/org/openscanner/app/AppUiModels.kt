@@ -1,11 +1,13 @@
 package org.openscanner.app
 
+import org.openscanner.core.domain.AccessPointStabilityLevel
 import org.openscanner.core.domain.Freshness
 import org.openscanner.core.domain.ObservedCongestion
 import org.openscanner.core.export.WifiLogField
 import org.openscanner.core.export.WifiLogStopReason
 import org.openscanner.core.model.PlatformCapabilities
 import org.openscanner.core.model.ScannerPhase
+import org.openscanner.core.model.SecurityType
 import org.openscanner.core.model.SignalSample
 import org.openscanner.core.model.WifiBand
 import org.openscanner.core.model.WifiChannelGroup
@@ -29,7 +31,7 @@ data class NetworkUiModel(
     val footprintCenterFrequencyMhz: Int?,
     val channelWidthMhz: Int?,
     val signalDbm: Int,
-    val security: String,
+    val securityTypes: Set<SecurityType>,
     val generation: String?,
     val connected: Boolean,
     val selected: Boolean,
@@ -64,7 +66,9 @@ data class NeighborhoodPostureUiModel(
 )
 
 data class StabilityUiModel(
-    val label: String = "Insufficient history",
+    // The display site resolves the localized label from this level; UI logic
+    // must key off the enum, never off a display string.
+    val level: AccessPointStabilityLevel = AccessPointStabilityLevel.INSUFFICIENT,
     val assessedSnapshots: Int = 0,
     val presentSnapshots: Int = 0,
     val absentPercent: Int? = null,
@@ -75,7 +79,6 @@ data class StabilityUiModel(
 data class ChannelGroupUiModel(
     val group: WifiChannelGroup,
     val enabled: Boolean,
-    val unavailableReason: String? = null,
 )
 
 data class WifiLoggingUiState(

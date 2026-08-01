@@ -49,9 +49,13 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.openscanner.app.ChannelGroupUiModel
+import org.openscanner.app.R
+import org.openscanner.app.ui.displayLabel
+import org.openscanner.app.ui.displaySelectorLabel
 import org.openscanner.app.ui.theme.ScannerAmber
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
@@ -86,7 +90,7 @@ fun AppHeader(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Open Scanner",
+                text = stringResource(R.string.common_app_name),
                 color = ScannerText,
                 style = MaterialTheme.typography.headlineMedium,
                 maxLines = 1,
@@ -112,27 +116,29 @@ fun StatusBadge(
     modifier: Modifier = Modifier,
 ) {
     val label = when (phase) {
-        ScannerPhase.PAUSED -> "PAUSED"
+        ScannerPhase.PAUSED -> stringResource(R.string.common_status_paused)
         ScannerPhase.LIVE -> when (freshness) {
-            Freshness.AGING -> "AGING"
-            Freshness.STALE -> "STALE"
-            else -> "LIVE"
+            Freshness.AGING -> stringResource(R.string.common_status_aging)
+            Freshness.STALE -> stringResource(R.string.common_status_stale)
+            else -> stringResource(R.string.common_status_live)
         }
-        ScannerPhase.CHECKING -> "CHECK"
-        else -> "OFFLINE"
+        ScannerPhase.CHECKING -> stringResource(R.string.common_status_check)
+        else -> stringResource(R.string.common_status_offline)
     }
-    val color = when (label) {
-        "LIVE" -> ScannerCyan
-        "PAUSED", "AGING" -> ScannerAmber
-        "STALE" -> ScannerOrange
+    val color = when {
+        phase == ScannerPhase.LIVE && freshness != Freshness.AGING && freshness != Freshness.STALE -> ScannerCyan
+        phase == ScannerPhase.PAUSED ||
+            (phase == ScannerPhase.LIVE && freshness == Freshness.AGING) -> ScannerAmber
+        phase == ScannerPhase.LIVE && freshness == Freshness.STALE -> ScannerOrange
         else -> ScannerMuted
     }
+    val statusDescription = stringResource(R.string.common_status_description, label)
     Box(
         modifier = modifier
             .heightIn(min = 32.dp)
             .border(1.5.dp, color, MaterialTheme.shapes.small)
             .padding(horizontal = ScannerSpacing.Md, vertical = ScannerSpacing.Sm)
-            .semantics { contentDescription = "Scanner status: $label" },
+            .semantics { contentDescription = statusDescription },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -168,6 +174,12 @@ fun ChannelGroupSelector(
         itemsIndexed(groups, key = { _, option -> option.group }) { index, option ->
             val selected = option.group == selectedGroup
             val interactionSource = remember { MutableInteractionSource() }
+            val selectedSuffix = stringResource(R.string.common_cd_selected)
+            val unavailableSuffix = stringResource(
+                R.string.common_cd_unavailable,
+                stringResource(R.string.common_channel_group_unavailable_reason),
+            )
+            val groupLabel = option.group.displayLabel()
             Box(
                 modifier = Modifier
                     .widthIn(min = 88.dp)
@@ -183,16 +195,16 @@ fun ChannelGroupSelector(
                         this.selected = selected
                         role = Role.RadioButton
                         contentDescription = buildString {
-                            append(option.group.label)
-                            if (selected) append(", selected")
-                            if (!option.enabled) append(", unavailable: ${option.unavailableReason}")
+                            append(groupLabel)
+                            if (selected) append(selectedSuffix)
+                            if (!option.enabled) append(unavailableSuffix)
                         }
                         if (!option.enabled) disabled()
                     },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = option.group.selectorLabel,
+                    text = option.group.displaySelectorLabel(),
                     color = when {
                         selected -> ScannerOnCyan
                         option.enabled -> ScannerMuted
@@ -286,33 +298,33 @@ fun ScannerUnavailable(
     val content = when (phase) {
         ScannerPhase.PERMISSION_REQUIRED -> Triple(
             Icons.Rounded.Lock,
-            "Nearby Wi-Fi permission",
-            "Android requires precise location permission to expose nearby access points. Scan data stays on this device.",
+            stringResource(R.string.common_unavailable_permission_title),
+            stringResource(R.string.common_unavailable_permission_body),
         )
         ScannerPhase.WIFI_DISABLED -> Triple(
             Icons.Rounded.WifiOff,
-            "Wi-Fi is off",
-            "Turn on Wi-Fi in Android settings. Open Scanner never joins a network or handles passwords.",
+            stringResource(R.string.common_unavailable_wifi_off_title),
+            stringResource(R.string.common_unavailable_wifi_off_body),
         )
         ScannerPhase.LOCATION_DISABLED -> Triple(
             Icons.Rounded.LocationOff,
-            "Location services are off",
-            "Android gates Wi-Fi scan results behind the system Location switch, even though this app does not read GPS coordinates.",
+            stringResource(R.string.common_unavailable_location_off_title),
+            stringResource(R.string.common_unavailable_location_off_body),
         )
         ScannerPhase.UNSUPPORTED -> Triple(
             Icons.Rounded.PortableWifiOff,
-            "Wi-Fi scanning unavailable",
-            "This device does not report compatible Wi-Fi hardware.",
+            stringResource(R.string.common_unavailable_unsupported_title),
+            stringResource(R.string.common_unavailable_unsupported_body),
         )
         ScannerPhase.ERROR -> Triple(
             Icons.Rounded.PortableWifiOff,
-            "Scan temporarily unavailable",
-            "The last safe snapshot is preserved. Error code: ${safeErrorCode ?: "UNKNOWN"}",
+            stringResource(R.string.common_unavailable_error_title),
+            stringResource(R.string.common_unavailable_error_body, safeErrorCode ?: "UNKNOWN"),
         )
         else -> Triple(
             Icons.Rounded.Wifi,
-            "Checking this device",
-            "Confirming Wi-Fi capabilities and permission state.",
+            stringResource(R.string.common_unavailable_checking_title),
+            stringResource(R.string.common_unavailable_checking_body),
         )
     }
     Column(
@@ -337,10 +349,10 @@ fun ScannerUnavailable(
         )
         Spacer(Modifier.height(ScannerSpacing.Xs))
         when (phase) {
-            ScannerPhase.PERMISSION_REQUIRED -> PrimaryAction("Grant permission", onRequestPermission)
-            ScannerPhase.WIFI_DISABLED -> PrimaryAction("Open Wi-Fi settings", onOpenWifiSettings)
-            ScannerPhase.LOCATION_DISABLED -> PrimaryAction("Open Location settings", onOpenLocationSettings)
-            ScannerPhase.ERROR -> PrimaryAction("Retry", onRetry)
+            ScannerPhase.PERMISSION_REQUIRED -> PrimaryAction(stringResource(R.string.common_action_grant_permission), onRequestPermission)
+            ScannerPhase.WIFI_DISABLED -> PrimaryAction(stringResource(R.string.common_action_open_wifi_settings), onOpenWifiSettings)
+            ScannerPhase.LOCATION_DISABLED -> PrimaryAction(stringResource(R.string.common_action_open_location_settings), onOpenLocationSettings)
+            ScannerPhase.ERROR -> PrimaryAction(stringResource(R.string.common_action_retry), onRetry)
             else -> Unit
         }
     }

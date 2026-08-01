@@ -41,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -51,11 +52,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.openscanner.app.NetworkUiModel
 import org.openscanner.app.OpenScannerUiState
+import org.openscanner.app.R
 import org.openscanner.app.ui.components.AppHeader
 import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.PrimaryAction
 import org.openscanner.app.ui.components.SignalGlyph
 import org.openscanner.app.ui.components.SignalHistoryChart
+import org.openscanner.app.ui.displayLabel
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
 import org.openscanner.app.ui.theme.ScannerIconWell
@@ -64,6 +67,7 @@ import org.openscanner.app.ui.theme.ScannerSpacing
 import org.openscanner.app.ui.theme.ScannerSurface
 import org.openscanner.app.ui.theme.ScannerSurfaceRaised
 import org.openscanner.app.ui.theme.ScannerText
+import org.openscanner.core.domain.AccessPointStabilityLevel
 import org.openscanner.core.domain.SignalClassifier
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,9 +100,9 @@ fun TrackScreen(
                 ) {
                     Icon(Icons.Rounded.Wifi, contentDescription = null, tint = ScannerCyan, modifier = Modifier.size(40.dp))
                 }
-                Text("No access point selected", color = ScannerText, style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.track_no_ap_selected), color = ScannerText, style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    "Open Scan and choose a network to track.",
+                    stringResource(R.string.track_open_scan_hint),
                     color = ScannerMuted,
                     style = MaterialTheme.typography.bodyLarge,
                 )
@@ -116,14 +120,14 @@ fun TrackScreen(
                         style = MaterialTheme.typography.displayMedium,
                     )
                     Text(
-                        "dBm",
+                        stringResource(R.string.track_dbm_unit),
                         color = ScannerMuted,
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(bottom = ScannerSpacing.Sm),
                     )
                 }
                 Text(
-                    SignalClassifier.classify(network.signalDbm).label,
+                    SignalClassifier.classify(network.signalDbm).displayLabel(),
                     color = ScannerCyan,
                     style = MaterialTheme.typography.headlineSmall,
                 )
@@ -135,23 +139,27 @@ fun TrackScreen(
             )
             EvidenceStrip(network, state.ageMs)
             InformationBanner(
-                icon = if (state.selectedStability.label == "Steady") {
+                icon = if (state.selectedStability.level == AccessPointStabilityLevel.STEADY) {
                     Icons.Rounded.CheckCircle
                 } else {
                     Icons.Rounded.Info
                 },
                 text = stabilityDescription(state),
-                positive = state.selectedStability.label == "Steady",
+                positive = state.selectedStability.level == AccessPointStabilityLevel.STEADY,
             )
             PrimaryAction(
-                label = if (state.paused) "Resume tracking" else "Pause tracking",
+                label = if (state.paused) {
+                    stringResource(R.string.track_resume_tracking)
+                } else {
+                    stringResource(R.string.track_pause_tracking)
+                },
                 onClick = { onPauseChanged(!state.paused) },
             )
             TextButton(
                 onClick = { pickerOpen = true },
                 modifier = Modifier.fillMaxWidth().heightIn(min = ScannerSpacing.MinTouchTarget),
             ) {
-                Text("Choose network", color = ScannerCyan, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.track_choose_network), color = ScannerCyan, style = MaterialTheme.typography.titleMedium)
             }
         }
     }
@@ -165,13 +173,13 @@ fun TrackScreen(
         ) {
             Column(Modifier.fillMaxWidth().padding(bottom = ScannerSpacing.Xl)) {
                 Text(
-                    "Choose network",
+                    stringResource(R.string.track_choose_network),
                     color = ScannerText,
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(horizontal = ScannerSpacing.Xl),
                 )
                 Text(
-                    "Track one access point without exposing its identifier outside this device.",
+                    stringResource(R.string.track_choose_network_hint),
                     color = ScannerMuted,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = ScannerSpacing.Xl, vertical = ScannerSpacing.Sm),
@@ -209,13 +217,17 @@ fun TrackScreen(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
-                                    "${candidate.channelGroup.label} · Ch ${candidate.channel ?: "—"}",
+                                    stringResource(
+                                        R.string.track_row_channel,
+                                        candidate.channelGroup.displayLabel(),
+                                        candidate.channel?.toString() ?: "—",
+                                    ),
                                     color = ScannerMuted,
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             }
                             Text(
-                                "${candidate.signalDbm} dBm",
+                                stringResource(R.string.track_row_signal_dbm, candidate.signalDbm),
                                 color = ScannerMuted,
                                 style = MaterialTheme.typography.labelSmall,
                             )
@@ -227,23 +239,30 @@ fun TrackScreen(
     }
 }
 
+@Composable
 private fun stabilityDescription(state: OpenScannerUiState): String {
     val stability = state.selectedStability
     if (!stability.sufficient) {
-        return "Stability: insufficient history. ${stability.presentSnapshots} of " +
-            "${stability.assessedSnapshots} assessed snapshots contain this AP; at least four recent snapshots are needed."
+        return stringResource(
+            R.string.track_stability_insufficient,
+            stability.presentSnapshots,
+            stability.assessedSnapshots,
+        )
     }
-    return buildString {
-        append("Stability: ${stability.label.lowercase()}. ")
-        append("RSSI range ${stability.rssiRangeDb ?: 0} dB; ")
-        append("present in ${stability.presentSnapshots} of ${stability.assessedSnapshots} recent snapshots")
-        stability.absentPercent?.let { append(" ($it% absent)") }
-        append(". This describes recent scan consistency, not connection quality.")
-    }
+    val absentSuffix = stability.absentPercent?.let { stringResource(R.string.track_absent_suffix, it) } ?: ""
+    return stringResource(
+        R.string.track_stability_description,
+        stability.level.displayLabel().lowercase(),
+        stability.rssiRangeDb ?: 0,
+        stability.presentSnapshots,
+        stability.assessedSnapshots,
+        absentSuffix,
+    )
 }
 
 @Composable
 private fun SelectedNetworkCard(network: NetworkUiModel, onClick: () -> Unit) {
+    val chooseNetworkContentDescription = stringResource(R.string.track_choose_network_cd, network.name)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -253,7 +272,7 @@ private fun SelectedNetworkCard(network: NetworkUiModel, onClick: () -> Unit) {
             .clickable(role = Role.Button, onClick = onClick)
             .semantics {
                 role = Role.Button
-                contentDescription = "Choose network. Currently ${network.name}"
+                contentDescription = chooseNetworkContentDescription
             }
             .padding(horizontal = ScannerSpacing.Lg, vertical = ScannerSpacing.Md),
         verticalAlignment = Alignment.CenterVertically,
@@ -263,7 +282,12 @@ private fun SelectedNetworkCard(network: NetworkUiModel, onClick: () -> Unit) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
             Text(network.name, color = ScannerText, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${network.channelGroup.label} · Channel ${network.channel ?: "unknown"} · ${network.signalDbm} dBm",
+                stringResource(
+                    R.string.track_selected_network_details,
+                    network.channelGroup.displayLabel(),
+                    network.channel?.toString() ?: stringResource(R.string.track_channel_unknown),
+                    network.signalDbm,
+                ),
                 color = ScannerMuted,
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -281,11 +305,16 @@ private fun EvidenceStrip(network: NetworkUiModel, ageMs: Long?) {
             .border(1.dp, ScannerBorder, MaterialTheme.shapes.small)
             .background(ScannerSurface),
     ) {
-        EvidenceCell("Channel", network.channel?.toString() ?: "—", Modifier.weight(1f))
+        EvidenceCell(stringResource(R.string.track_channel), network.channel?.toString() ?: "—", Modifier.weight(1f))
         Box(Modifier.width(1.dp).fillMaxHeight().background(ScannerBorder))
-        EvidenceCell("Width", network.channelWidthMhz?.let { "$it MHz" } ?: "Unknown", Modifier.weight(1f))
+        EvidenceCell(
+            stringResource(R.string.track_width),
+            network.channelWidthMhz?.let { stringResource(R.string.track_width_mhz, it) }
+                ?: stringResource(R.string.track_width_unknown),
+            Modifier.weight(1f),
+        )
         Box(Modifier.width(1.dp).fillMaxHeight().background(ScannerBorder))
-        EvidenceCell("Updated", compactAge(ageMs), Modifier.weight(1f))
+        EvidenceCell(stringResource(R.string.track_updated), compactAge(ageMs), Modifier.weight(1f))
     }
 }
 
@@ -301,9 +330,10 @@ private fun EvidenceCell(label: String, value: String, modifier: Modifier = Modi
     }
 }
 
+@Composable
 private fun compactAge(ageMs: Long?): String = when {
     ageMs == null -> "—"
-    ageMs < 1_000L -> "Now"
-    ageMs < 60_000L -> "${ageMs / 1_000L}s"
-    else -> "${ageMs / 60_000L}m"
+    ageMs < 1_000L -> stringResource(R.string.track_age_now)
+    ageMs < 60_000L -> stringResource(R.string.track_age_seconds, ageMs / 1_000L)
+    else -> stringResource(R.string.track_age_minutes, ageMs / 60_000L)
 }

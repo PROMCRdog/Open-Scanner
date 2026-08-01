@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -55,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.openscanner.app.OpenScannerUiState
+import org.openscanner.app.R
 import org.openscanner.app.ui.components.AppHeader
 import org.openscanner.app.ui.theme.ScannerAmber
 import org.openscanner.app.ui.theme.ScannerBorder
@@ -85,23 +87,27 @@ fun SettingsScreen(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm),
     ) {
-        AppHeader(eyebrow = "Privacy and display", phase = state.phase, freshness = state.freshness)
-        SectionLabel("Privacy")
+        AppHeader(
+            eyebrow = stringResource(R.string.settings_eyebrow),
+            phase = state.phase,
+            freshness = state.freshness,
+        )
+        SectionLabel(stringResource(R.string.settings_section_privacy))
         ToggleRow(
             icon = Icons.Rounded.VisibilityOff,
-            label = "Privacy mode",
-            detail = "Mask network names and hardware addresses on screen",
+            label = stringResource(R.string.settings_privacy_mode_label),
+            detail = stringResource(R.string.settings_privacy_mode_detail),
             checked = state.privacyMode,
             enabled = true,
             onCheckedChange = onPrivacyChanged,
         )
         ToggleRow(
             icon = Icons.Rounded.Lock,
-            label = "Redact reports",
+            label = stringResource(R.string.settings_redact_reports_label),
             detail = if (state.redactExports) {
-                "Mask identifiers, local addresses, and precise timestamps in snapshots and new logs"
+                stringResource(R.string.settings_redact_reports_detail_on)
             } else {
-                "Unredacted reports may reveal your location and local network; every export is previewed"
+                stringResource(R.string.settings_redact_reports_detail_off)
             },
             checked = state.redactExports,
             enabled = true,
@@ -109,18 +115,18 @@ fun SettingsScreen(
                 if (enabled) onRedactExportsChanged(true) else allowUnredactedOpen = true
             },
         )
-        SectionLabel("Scanning")
+        SectionLabel(stringResource(R.string.settings_section_scanning))
         SettingsRow(
             icon = Icons.Rounded.Wifi,
-            label = "Android Wi-Fi settings",
-            detail = "Joining networks and passwords stay in the system UI",
+            label = stringResource(R.string.settings_android_wifi_label),
+            detail = stringResource(R.string.settings_android_wifi_detail),
             onClick = onOpenWifiSettings,
         )
         WifiScanThrottleStatusRow(state.capabilities.wifiScanThrottleEnabled)
         SettingsRow(
             icon = Icons.Rounded.Schedule,
-            label = "Refresh request interval",
-            detail = "Requested every ${state.refreshIntervalSeconds}s; Android may throttle or reuse results",
+            label = stringResource(R.string.settings_refresh_interval_label),
+            detail = stringResource(R.string.settings_refresh_interval_detail, state.refreshIntervalSeconds),
             onClick = {},
             trailing = null,
         )
@@ -128,46 +134,45 @@ fun SettingsScreen(
             selectedSeconds = state.refreshIntervalSeconds,
             onSelect = onRefreshIntervalChanged,
         )
-        SectionLabel("Project")
+        SectionLabel(stringResource(R.string.settings_section_project))
         SettingsRow(
             icon = Icons.Rounded.Info,
-            label = "About Open Scanner",
-            detail = "Version 0.1.0 · Apache License 2.0 · open source",
+            label = stringResource(R.string.settings_about_label),
+            detail = stringResource(R.string.settings_about_detail),
             onClick = { aboutOpen = true },
         )
         SettingsRow(
             icon = Icons.Rounded.RestartAlt,
-            label = "Reset settings",
-            detail = "Restore privacy, report redaction, and refresh preferences to defaults",
+            label = stringResource(R.string.settings_reset_label),
+            detail = stringResource(R.string.settings_reset_detail),
             onClick = { resetOpen = true },
         )
     }
 
     if (aboutOpen) {
         SettingsAlertDialog(
-            title = "Open Scanner 0.1.0",
+            title = stringResource(R.string.settings_about_dialog_title),
             onDismiss = { aboutOpen = false },
             icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
             text = {
                 Text(
-                    "A passive, local-first Wi-Fi analysis toolkit. No account, ads, telemetry, or Internet permission. " +
-                        "Source is licensed under Apache License 2.0. Android scan freshness and hardware support vary by device.",
+                    stringResource(R.string.settings_about_dialog_text),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
-            confirmButton = { TextButton(onClick = { aboutOpen = false }) { Text("Done") } },
+            confirmButton = {
+                TextButton(onClick = { aboutOpen = false }) { Text(stringResource(R.string.settings_done)) }
+            },
         )
     }
     if (allowUnredactedOpen) {
         SettingsAlertDialog(
-            title = "Allow unredacted reports?",
+            title = stringResource(R.string.settings_unredacted_dialog_title),
             onDismiss = { allowUnredactedOpen = false },
             icon = { Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = ScannerAmber) },
             text = {
                 Text(
-                    "This permits future snapshot exports and new Wi-Fi log sessions to include raw SSIDs, " +
-                        "BSSIDs, local IP addresses, gateways, DNS servers, and precise timestamps. " +
-                        "Reports remain local until you explicitly share their exact preview.",
+                    stringResource(R.string.settings_unredacted_dialog_text),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -175,21 +180,20 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     allowUnredactedOpen = false
                     onRedactExportsChanged(false)
-                }) { Text("Allow unredacted", color = ScannerAmber) }
+                }) { Text(stringResource(R.string.settings_allow_unredacted), color = ScannerAmber) }
             },
             dismissButton = {
-                TextButton(onClick = { allowUnredactedOpen = false }) { Text("Keep redaction on") }
+                TextButton(onClick = { allowUnredactedOpen = false }) { Text(stringResource(R.string.settings_keep_redaction_on)) }
             },
         )
     }
     if (resetOpen) {
         SettingsAlertDialog(
-            title = "Reset settings?",
+            title = stringResource(R.string.settings_reset_dialog_title),
             onDismiss = { resetOpen = false },
             text = {
                 Text(
-                    "This restores default display privacy, report redaction, and refresh preferences. " +
-                        "Scan history and Wi-Fi log sessions already remain memory-only.",
+                    stringResource(R.string.settings_reset_dialog_text),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -197,9 +201,9 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     resetOpen = false
                     onResetSettings()
-                }) { Text("Reset") }
+                }) { Text(stringResource(R.string.settings_reset)) }
             },
-            dismissButton = { TextButton(onClick = { resetOpen = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { resetOpen = false }) { Text(stringResource(R.string.settings_cancel)) } },
         )
     }
 }
@@ -262,6 +266,12 @@ private fun RefreshIntervalSelector(
         options.forEachIndexed { index, seconds ->
             val selected = seconds == selectedSeconds
             val interactionSource = remember { MutableInteractionSource() }
+            val intervalLabel = stringResource(R.string.settings_refresh_interval_seconds, seconds)
+            val segmentContentDescription = if (selected) {
+                stringResource(R.string.settings_refresh_interval_seconds_selected, seconds)
+            } else {
+                intervalLabel
+            }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -275,15 +285,12 @@ private fun RefreshIntervalSelector(
                     .semantics {
                         this.selected = selected
                         role = Role.RadioButton
-                        contentDescription = buildString {
-                            append("$seconds s")
-                            if (selected) append(", selected")
-                        }
+                        contentDescription = segmentContentDescription
                     },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "$seconds s",
+                    intervalLabel,
                     color = if (selected) ScannerOnCyan else ScannerMuted,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
@@ -332,9 +339,9 @@ private fun ToggleRow(
 @Composable
 private fun WifiScanThrottleStatusRow(enabled: Boolean?) {
     val status = when (enabled) {
-        true -> "ON"
-        false -> "OFF"
-        null -> "N/A"
+        true -> stringResource(R.string.settings_status_on)
+        false -> stringResource(R.string.settings_status_off)
+        null -> stringResource(R.string.settings_status_na)
     }
     val statusColor = when (enabled) {
         true -> ScannerAmber
@@ -342,16 +349,18 @@ private fun WifiScanThrottleStatusRow(enabled: Boolean?) {
         null -> ScannerMuted
     }
     val detail = when (enabled) {
-        true -> "Disable for local testing: Developer options › Networking › Wi-Fi scan throttling. May increase battery use."
-        false -> "Disabled in Developer options; Android may scan more often and use more battery."
-        null -> "Status unavailable. On Android 10+, check Developer options › Networking › Wi-Fi scan throttling."
+        true -> stringResource(R.string.settings_wifi_scan_throttling_detail_on)
+        false -> stringResource(R.string.settings_wifi_scan_throttling_detail_off)
+        null -> stringResource(R.string.settings_wifi_scan_throttling_detail_unavailable)
     }
+    val throttleLabel = stringResource(R.string.settings_wifi_scan_throttling_label)
+    val rowContentDescription = stringResource(R.string.settings_wifi_scan_throttling_cd, status, detail)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = ScannerSpacing.MinTouchTarget + 30.dp)
             .semantics(mergeDescendants = true) {
-                contentDescription = "Wi-Fi scan throttling: $status. $detail"
+                contentDescription = rowContentDescription
             }
             .padding(horizontal = ScannerSpacing.Sm, vertical = ScannerSpacing.Md - 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -359,7 +368,7 @@ private fun WifiScanThrottleStatusRow(enabled: Boolean?) {
     ) {
         SettingIcon(Icons.Rounded.Speed)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
-            Text("Wi-Fi scan throttling", color = ScannerText, style = MaterialTheme.typography.titleMedium)
+            Text(throttleLabel, color = ScannerText, style = MaterialTheme.typography.titleMedium)
             Text(detail, color = ScannerMuted, style = MaterialTheme.typography.labelSmall)
         }
         Text(

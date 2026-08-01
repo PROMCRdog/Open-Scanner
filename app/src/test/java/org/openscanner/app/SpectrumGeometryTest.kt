@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.openscanner.core.model.SecurityType
 import org.openscanner.core.model.WifiBand
 import org.openscanner.core.model.WifiChannelGroup
 
@@ -170,7 +171,7 @@ class SpectrumGeometryTest {
         footprintCenterFrequencyMhz = centerMhz,
         channelWidthMhz = widthMhz,
         signalDbm = -55,
-        security = "WPA3 Personal",
+        securityTypes = setOf(SecurityType.WPA3_PERSONAL),
         generation = "Wi-Fi 6",
         connected = false,
         selected = true,

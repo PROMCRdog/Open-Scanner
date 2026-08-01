@@ -138,13 +138,15 @@ class MainActivity : ComponentActivity() {
                 clipData = ClipData.newRawUri(document.title, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            startActivity(Intent.createChooser(intent, "Share ${document.title}"))
+            startActivity(
+                Intent.createChooser(intent, getString(R.string.main_share_chooser_title, document.title)),
+            )
             lifecycleScope.launch {
                 delay(EXPORT_RETENTION_MS)
                 runCatching { exportFile.delete() }
             }
         }.onFailure {
-            Toast.makeText(this, "Unable to prepare export file", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.main_export_prepare_error), Toast.LENGTH_LONG).show()
         }
     }
 

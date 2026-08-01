@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -54,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.openscanner.app.AppTab
 import org.openscanner.app.OpenScannerUiState
+import org.openscanner.app.R
 import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.ScannerUnavailable
 import org.openscanner.app.ui.screens.ScanScreen
@@ -217,7 +219,7 @@ fun OpenScannerApp(
             },
             title = {
                 Text(
-                    text = "${preview.document.title} preview",
+                    text = stringResource(R.string.app_export_preview_title, preview.document.title),
                     style = MaterialTheme.typography.titleLarge,
                 )
             },
@@ -226,12 +228,9 @@ fun OpenScannerApp(
                     InformationBanner(
                         icon = if (preview.document.redacted) Icons.Rounded.Lock else Icons.Rounded.WarningAmber,
                         text = if (preview.document.redacted) {
-                            "This scrollable preview contains the entire exact file payload Android will share. " +
-                                "Network names, hardware addresses, and local addresses are redacted."
+                            stringResource(R.string.app_preview_banner_redacted)
                         } else {
-                            "UNREDACTED REPORT: this exact shared payload may contain network names, hardware " +
-                                "addresses, local IP addresses, gateways, DNS servers, and precise timestamps. " +
-                                "Review every line and share only with a trusted recipient."
+                            stringResource(R.string.app_preview_banner_unredacted)
                         },
                         positive = preview.document.redacted,
                     )
@@ -261,13 +260,19 @@ fun OpenScannerApp(
                     shareExport(preview.document)
                 }) {
                     Text(
-                        if (preview.document.redacted) "Share" else "Share unredacted",
+                        if (preview.document.redacted) {
+                            stringResource(R.string.app_share)
+                        } else {
+                            stringResource(R.string.app_share_unredacted)
+                        },
                         color = ScannerAmber,
                     )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { exportPreview = null }) { Text("Cancel", color = ScannerMuted) }
+                TextButton(onClick = { exportPreview = null }) {
+                    Text(stringResource(R.string.app_cancel), color = ScannerMuted)
+                }
             },
             containerColor = ScannerSurfaceRaised,
             titleContentColor = ScannerText,
@@ -282,11 +287,11 @@ private fun BottomNavigation(
     onTabSelected: (AppTab) -> Unit,
 ) {
     val destinations = listOf(
-        Triple(AppTab.SCAN, "Scan", Icons.Filled.Wifi),
-        Triple(AppTab.TRACK, "Track", Icons.Filled.TrackChanges),
-        Triple(AppTab.SPECTRUM, "Spectrum", Icons.Filled.BarChart),
-        Triple(AppTab.TOOLS, "Tools", Icons.Filled.Build),
-        Triple(AppTab.SETTINGS, "Settings", Icons.Filled.Settings),
+        Triple(AppTab.SCAN, stringResource(R.string.app_tab_scan), Icons.Filled.Wifi),
+        Triple(AppTab.TRACK, stringResource(R.string.app_tab_track), Icons.Filled.TrackChanges),
+        Triple(AppTab.SPECTRUM, stringResource(R.string.app_tab_spectrum), Icons.Filled.BarChart),
+        Triple(AppTab.TOOLS, stringResource(R.string.app_tab_tools), Icons.Filled.Build),
+        Triple(AppTab.SETTINGS, stringResource(R.string.app_tab_settings), Icons.Filled.Settings),
     )
     Column(
         modifier = Modifier.fillMaxWidth().background(ScannerSurface).navigationBarsPadding(),
