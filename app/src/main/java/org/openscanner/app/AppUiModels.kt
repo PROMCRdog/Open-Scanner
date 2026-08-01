@@ -99,7 +99,12 @@ data class WifiLoggingUiState(
 data class OpenScannerUiState(
     val phase: ScannerPhase = ScannerPhase.CHECKING,
     val activeTab: AppTab = AppTab.TRACK,
-    val capabilities: PlatformCapabilities = PlatformCapabilities(true, true, false),
+    val capabilities: PlatformCapabilities = PlatformCapabilities(
+        hasWifiHardware = true,
+        supports5Ghz = true,
+        supports6Ghz = false,
+        wifiScanThrottleStateResolved = false,
+    ),
     val channelGroups: List<ChannelGroupUiModel> = emptyList(),
     val selectedChannelGroup: WifiChannelGroup = WifiChannelGroup.GHZ_5_2,
     val networks: List<NetworkUiModel> = emptyList(),

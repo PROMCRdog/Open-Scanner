@@ -26,7 +26,8 @@ class ScanCadenceControllerTest {
         controller.setActive(true)
         assertTrue(controller.beginRequestIfDue(10_000L))
 
-        controller.markScanCompleted()
+        assertTrue(controller.markScanResultsAvailable())
+        controller.markResultProcessingCompleted()
         assertEquals(15_000L, controller.nextWakeElapsedMs(12_000L))
         assertFalse(controller.beginRequestIfDue(14_999L))
         assertTrue(controller.beginRequestIfDue(15_000L))
@@ -39,7 +40,8 @@ class ScanCadenceControllerTest {
         controller.setActive(true)
         assertTrue(controller.beginRequestIfDue(1_000L))
 
-        controller.markScanCompleted()
+        assertTrue(controller.markScanResultsAvailable())
+        controller.markResultProcessingCompleted()
         assertEquals(6_000L, controller.nextWakeElapsedMs(8_000L))
         assertTrue(controller.beginRequestIfDue(8_000L))
     }
@@ -54,10 +56,12 @@ class ScanCadenceControllerTest {
         controller.enqueueManualRequest()
         assertFalse(controller.beginRequestIfDue(2_000L))
 
-        controller.markScanCompleted()
+        assertTrue(controller.markScanResultsAvailable())
+        controller.markResultProcessingCompleted()
         assertEquals(2_000L, controller.nextWakeElapsedMs(2_000L))
         assertTrue(controller.beginRequestIfDue(2_000L))
-        controller.markScanCompleted()
+        assertTrue(controller.markScanResultsAvailable())
+        controller.markResultProcessingCompleted()
         assertEquals(32_000L, controller.nextWakeElapsedMs(3_000L))
     }
 
@@ -72,6 +76,24 @@ class ScanCadenceControllerTest {
         assertTrue(controller.consumeTimeoutIfDue(20_000L))
         assertFalse(controller.isRequestInFlight)
         assertTrue(controller.beginRequestIfDue(20_000L))
+    }
+
+    @Test
+    fun delayedResultCommitBlocksAnOverdueRequestAndQueuedManualRefresh() {
+        val controller = ScanCadenceController()
+        controller.updateConfiguration(5, wifiScanThrottleEnabled = false)
+        controller.setActive(true)
+        assertTrue(controller.beginRequestIfDue(1_000L))
+
+        assertTrue(controller.markScanResultsAvailable())
+        controller.enqueueManualRequest()
+        assertTrue(controller.isResultProcessing)
+        assertNull(controller.nextWakeElapsedMs(8_000L))
+        assertFalse(controller.beginRequestIfDue(8_000L))
+
+        controller.markResultProcessingCompleted()
+        assertEquals(8_000L, controller.nextWakeElapsedMs(8_000L))
+        assertTrue(controller.beginRequestIfDue(8_000L))
     }
 
     @Test
@@ -105,7 +127,8 @@ class ScanCadenceControllerTest {
         controller.updateConfiguration(30, wifiScanThrottleEnabled = false)
         controller.setActive(true)
         assertTrue(controller.beginRequestIfDue(1_000L))
-        controller.markScanCompleted()
+        assertTrue(controller.markScanResultsAvailable())
+        controller.markResultProcessingCompleted()
 
         controller.updateConfiguration(5, wifiScanThrottleEnabled = false)
         assertEquals(6_000L, controller.nextWakeElapsedMs(2_000L))
@@ -117,10 +140,13 @@ class ScanCadenceControllerTest {
         val controller = ScanCadenceController()
         controller.setActive(true)
         assertTrue(controller.beginRequestIfDue(1_000L))
+        assertTrue(controller.markScanResultsAvailable())
         controller.enqueueManualRequest()
+        assertTrue(controller.isResultProcessing)
 
         controller.setActive(false)
         assertFalse(controller.isRequestInFlight)
+        assertFalse(controller.isResultProcessing)
         assertNull(controller.nextWakeElapsedMs(2_000L))
 
         controller.setActive(true)

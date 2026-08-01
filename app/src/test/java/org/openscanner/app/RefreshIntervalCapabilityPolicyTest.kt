@@ -10,6 +10,11 @@ import org.openscanner.core.model.WifiRefreshIntervalPolicy
 
 class RefreshIntervalCapabilityPolicyTest {
     @Test
+    fun initialUiStateKeepsThrottleCapabilityUnresolved() {
+        assertFalse(OpenScannerUiState().capabilities.wifiScanThrottleStateResolved)
+    }
+
+    @Test
     fun savedFastIntervalIsNotResetWhileCapabilityDiscoveryIsUnresolved() {
         assertFalse(
             RefreshIntervalCapabilityPolicy.shouldResetSavedFastInterval(

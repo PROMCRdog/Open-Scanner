@@ -24,6 +24,9 @@ internal class ScanCadenceController(
     var isRequestInFlight: Boolean = false
         private set
 
+    var isResultProcessing: Boolean = false
+        private set
+
     private var lastRequestStartedAtElapsedMs: Long? = null
     private var manualRequestPending: Boolean = false
 
@@ -46,6 +49,7 @@ internal class ScanCadenceController(
         isActive = active
         if (!active) {
             isRequestInFlight = false
+            isResultProcessing = false
             lastRequestStartedAtElapsedMs = null
             manualRequestPending = false
         }
@@ -56,7 +60,7 @@ internal class ScanCadenceController(
     }
 
     fun nextWakeElapsedMs(nowElapsedMs: Long): Long? {
-        if (!isActive) return null
+        if (!isActive || isResultProcessing) return null
         val lastStart = lastRequestStartedAtElapsedMs
         return when {
             isRequestInFlight && lastStart != null -> lastStart + requestTimeoutMs
@@ -66,7 +70,7 @@ internal class ScanCadenceController(
     }
 
     fun beginRequestIfDue(nowElapsedMs: Long): Boolean {
-        if (!isActive || isRequestInFlight) return false
+        if (!isActive || isRequestInFlight || isResultProcessing) return false
         val lastStart = lastRequestStartedAtElapsedMs
         val due = manualRequestPending || lastStart == null ||
             nowElapsedMs >= lastStart + effectiveIntervalMs
@@ -82,8 +86,22 @@ internal class ScanCadenceController(
         isRequestInFlight = false
     }
 
-    fun markScanCompleted() {
+    /**
+     * Releases the platform request at broadcast arrival but keeps cadence
+     * blocked until the corresponding result state has committed.
+     *
+     * @return true when the broadcast completed the modeled request, false
+     * for an unsolicited broadcast.
+     */
+    fun markScanResultsAvailable(): Boolean {
+        val completedRequest = isRequestInFlight
         isRequestInFlight = false
+        isResultProcessing = isActive
+        return completedRequest
+    }
+
+    fun markResultProcessingCompleted() {
+        isResultProcessing = false
     }
 
     fun consumeTimeoutIfDue(nowElapsedMs: Long): Boolean {

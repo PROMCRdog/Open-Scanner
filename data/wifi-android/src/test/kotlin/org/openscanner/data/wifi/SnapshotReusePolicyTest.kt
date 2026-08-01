@@ -14,20 +14,18 @@ import org.openscanner.core.model.WifiGeneration
 
 class SnapshotReusePolicyTest {
     @Test
-    fun reusedRadioContentRefreshesConnectionAndRowMarkerTogether() {
+    fun nonFreshCycleRetainsRadioContentAndRefreshesOnlyConnectionEvidence() {
         val previousObservation = observation(id = "old", connected = true)
         val previous = snapshot(
-            observations = listOf(previousObservation),
+            observations = listOf(
+                previousObservation,
+                observation(id = "new", connected = false),
+            ),
             connection = connection(bssid = "old"),
         )
-        val refreshedObservations = listOf(
-            previousObservation.copy(isConnected = false),
-            observation(id = "new", connected = true),
-        )
 
-        val refreshed = refreshReusedSnapshot(
+        val refreshed = refreshNonFreshSnapshot(
             previous = previous,
-            observations = refreshedObservations,
             connection = connection(bssid = "new"),
             requestAccepted = null,
             resultsUpdated = false,
@@ -37,8 +35,12 @@ class SnapshotReusePolicyTest {
         assertEquals("new", refreshed.connection.bssid)
         assertFalse(refreshed.observations.first { it.id == "old" }.isConnected)
         assertTrue(refreshed.observations.first { it.id == "new" }.isConnected)
+        assertEquals(previous.observations.map { it.id }, refreshed.observations.map { it.id })
+        assertEquals(previous.observations.map { it.rssiDbm }, refreshed.observations.map { it.rssiDbm })
         assertTrue(refreshed.likelyThrottled)
         assertEquals(previous.sequenceId, refreshed.sequenceId)
+        assertEquals(previous.capturedAtElapsedMs, refreshed.capturedAtElapsedMs)
+        assertEquals(previous.sourceTimestampMicros, refreshed.sourceTimestampMicros)
     }
 
     @Test
@@ -52,9 +54,8 @@ class SnapshotReusePolicyTest {
             likelyThrottled = true,
         )
 
-        val refreshed = refreshReusedSnapshot(
+        val refreshed = refreshNonFreshSnapshot(
             previous = previous,
-            observations = previous.observations,
             connection = previous.connection,
             requestAccepted = null,
             resultsUpdated = true,
