@@ -22,10 +22,11 @@ Raw and displayed SSIDs, BSSIDs, IP addresses, gateway/DNS addresses, scan times
 - Sensitive model `toString()` methods redact identifiers.
 - Production code emits no scan results to Android system logs, crash reporting, telemetry, or analytics.
 - Privacy Mode transforms identifiers before Compose UI models.
-- JSON/CSV encoders always redact internally and coarsen timestamps before preview.
-- The explicit session logger fixes its selectable field set at start and creates immutable records only after applying salted stable SSID/BSSID session aliases, local-address masking, and minute-precision wall-clock reduction. It stores no raw SSID, BSSID, or local address value.
+- Report redaction defaults on and persists locally. Disabling it requires a warning confirmation; every unredacted payload then receives a conspicuous exact-preview warning and a separate **Share unredacted** action.
+- Snapshot encoders apply the current report-redaction setting internally. Redacted output aliases/masks identifiers and coarsens timestamps; unredacted output labels itself in metadata, title, subject, and filename.
+- The explicit session logger freezes both its selectable field set and redaction choice at start. Redacted sessions create immutable records only after salted stable SSID/BSSID aliases, local-address masking, and minute-precision wall-clock reduction. Explicitly unredacted sessions may retain selected raw values in RAM until clear, replacement, or process exit.
 - Session logs are RAM-only and stop at 500 state records or 25,000 AP rows. Clear/replace actions are explicit; process exit clears the session.
-- Approved exports are written under the app cache only after exact preview, shared through a non-exported `FileProvider` with a temporary read grant, and files older than 24 hours are removed on a later export.
+- Approved exports are written under the app cache only after exact preview, shared through a non-exported `FileProvider` with a temporary read grant, and removed after one hour while the process remains alive or during a later app start/export.
 - Histories are RAM-only and globally bounded to 128 networks, 60 points per network, and 30 minutes; process exit clears them.
 - Android owns joining, credentials, captive-portal login, and Wi-Fi settings.
 - Tests cover representative channel conversion, legacy and unknown security parsing, proportional spectrum-width truthfulness, paused/stale history windows and pruning, scan lifecycle serialization, deterministic connection selection, privacy transformation, and export leakage.
@@ -36,4 +37,4 @@ A rooted or compromised OS, physical access to an unlocked device, radio-level a
 
 ## Future-feature gate
 
-Any active DNS/HTTP/TCP test, LAN discovery, throughput test, VPN mode, external radio, durable saved session, raw export, or background session needs a separate threat-model update, permission review, explicit consent flow, and release evidence before implementation.
+Any active DNS/HTTP/TCP test, LAN discovery, throughput test, VPN mode, external radio, durable saved session, background session, or expansion of raw-report scope needs a separate threat-model update, permission review, explicit consent flow, and release evidence before implementation.

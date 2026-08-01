@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -70,6 +71,7 @@ import org.openscanner.app.ui.theme.ScannerText
 fun SettingsScreen(
     state: OpenScannerUiState,
     onPrivacyChanged: (Boolean) -> Unit,
+    onRedactExportsChanged: (Boolean) -> Unit,
     onRefreshIntervalChanged: (Int) -> Unit,
     onOpenWifiSettings: () -> Unit,
     onResetSettings: () -> Unit,
@@ -77,6 +79,7 @@ fun SettingsScreen(
 ) {
     var aboutOpen by remember { mutableStateOf(false) }
     var resetOpen by remember { mutableStateOf(false) }
+    var allowUnredactedOpen by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
@@ -94,11 +97,17 @@ fun SettingsScreen(
         )
         ToggleRow(
             icon = Icons.Rounded.Lock,
-            label = "Redact exports",
-            detail = "Locked on in version 0.1; every shared report is previewed",
-            checked = true,
-            enabled = false,
-            onCheckedChange = {},
+            label = "Redact reports",
+            detail = if (state.redactExports) {
+                "Mask identifiers, local addresses, and precise timestamps in snapshots and new logs"
+            } else {
+                "Unredacted reports may reveal your location and local network; every export is previewed"
+            },
+            checked = state.redactExports,
+            enabled = true,
+            onCheckedChange = { enabled ->
+                if (enabled) onRedactExportsChanged(true) else allowUnredactedOpen = true
+            },
         )
         SectionLabel("Scanning")
         SettingsRow(
@@ -129,7 +138,7 @@ fun SettingsScreen(
         SettingsRow(
             icon = Icons.Rounded.RestartAlt,
             label = "Reset settings",
-            detail = "Restore privacy and refresh preferences to defaults",
+            detail = "Restore privacy, report redaction, and refresh preferences to defaults",
             onClick = { resetOpen = true },
         )
     }
@@ -149,13 +158,38 @@ fun SettingsScreen(
             confirmButton = { TextButton(onClick = { aboutOpen = false }) { Text("Done") } },
         )
     }
+    if (allowUnredactedOpen) {
+        SettingsAlertDialog(
+            title = "Allow unredacted reports?",
+            onDismiss = { allowUnredactedOpen = false },
+            icon = { Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = ScannerAmber) },
+            text = {
+                Text(
+                    "This permits future snapshot exports and new Wi-Fi log sessions to include raw SSIDs, " +
+                        "BSSIDs, local IP addresses, gateways, DNS servers, and precise timestamps. " +
+                        "Reports remain local until you explicitly share their exact preview.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    allowUnredactedOpen = false
+                    onRedactExportsChanged(false)
+                }) { Text("Allow unredacted", color = ScannerAmber) }
+            },
+            dismissButton = {
+                TextButton(onClick = { allowUnredactedOpen = false }) { Text("Keep redaction on") }
+            },
+        )
+    }
     if (resetOpen) {
         SettingsAlertDialog(
             title = "Reset settings?",
             onDismiss = { resetOpen = false },
             text = {
                 Text(
-                    "This restores default privacy and refresh preferences. Scan history already remains memory-only.",
+                    "This restores default display privacy, report redaction, and refresh preferences. " +
+                        "Scan history and Wi-Fi log sessions already remain memory-only.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -288,6 +322,7 @@ private fun ToggleRow(
             checked = checked,
             enabled = enabled,
             onCheckedChange = onCheckedChange,
+            modifier = Modifier.semantics { contentDescription = label },
             colors = SwitchDefaults.colors(checkedTrackColor = ScannerCyan),
         )
     }

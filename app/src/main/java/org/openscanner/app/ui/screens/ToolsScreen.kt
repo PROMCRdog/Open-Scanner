@@ -66,10 +66,10 @@ import org.openscanner.app.ui.theme.ScannerSurface
 import org.openscanner.app.ui.theme.ScannerSurfaceRaised
 import org.openscanner.app.ui.theme.ScannerText
 import org.openscanner.core.export.ExportFormat
-import org.openscanner.core.export.RedactedWifiLogRecorder
 import org.openscanner.core.export.WifiLogField
 import org.openscanner.core.export.WifiLogFieldCategory
 import org.openscanner.core.export.WifiLogFormat
+import org.openscanner.core.export.WifiLogRecorder
 import org.openscanner.core.export.WifiLogStopReason
 import org.openscanner.core.model.ScannerPhase
 
@@ -147,7 +147,11 @@ fun ToolsScreen(
                 detail = if (state.snapshotSequence == null) {
                     "A completed scan is required before export"
                 } else {
-                    "Preview redacted JSON or CSV before sharing"
+                    if (state.redactExports) {
+                        "Preview redacted JSON or CSV before sharing"
+                    } else {
+                        "Preview UNREDACTED JSON or CSV before sharing"
+                    }
                 },
             ) {
                 if (state.snapshotSequence == null) dialog = ToolDialog.NO_SNAPSHOT else snapshotExportChooser = true
@@ -177,7 +181,11 @@ fun ToolsScreen(
     if (snapshotExportChooser) {
         FormatChooserDialog(
             title = "Choose snapshot format",
-            explanation = "A redacted preview is shown before a temporary file is shared.",
+            explanation = if (state.redactExports) {
+                "A redacted preview is shown before a temporary file is shared."
+            } else {
+                "The preview is UNREDACTED and may contain sensitive network identifiers and local addresses."
+            },
             labels = ExportFormat.entries.map { it.label },
             onChoose = { index ->
                 snapshotExportChooser = false
@@ -189,7 +197,11 @@ fun ToolsScreen(
     if (logExportChooser) {
         FormatChooserDialog(
             title = "Choose log format",
-            explanation = "Text is human-readable; JSON and CSV are structured. The preview is the exact redacted file payload.",
+            explanation = if (state.logging.redacted == false) {
+                "Text is human-readable; JSON and CSV are structured. The exact preview is UNREDACTED."
+            } else {
+                "Text is human-readable; JSON and CSV are structured. The preview is the exact redacted payload."
+            },
             labels = WifiLogFormat.entries.map { it.label },
             onChoose = { index ->
                 logExportChooser = false
@@ -201,6 +213,7 @@ fun ToolsScreen(
     if (fieldChooser) {
         LogFieldChooser(
             selected = state.logging.selectedFields,
+            redacted = state.redactExports,
             onFieldChanged = onLogFieldChanged,
             onSetAll = onSetAllLogFields,
             onDismiss = { fieldChooser = false },
@@ -280,9 +293,12 @@ private fun WifiLoggingPanel(
                 Text("Wi-Fi session log", color = ScannerText, style = MaterialTheme.typography.titleLarge)
                 Text(
                     if (logging.active) {
-                        "${logging.recordedFields.size} logged fields · identifiers redacted"
+                        "${logging.recordedFields.size} logged fields · " +
+                            if (logging.redacted == false) "UNREDACTED" else "identifiers redacted"
                     } else if (logging.hasSession) {
-                        "${logging.recordedFields.size} logged fields · ${logging.selectedFields.size} selected for next session"
+                        "${logging.recordedFields.size} logged fields · " +
+                            "${if (logging.redacted == false) "UNREDACTED" else "redacted"} session · " +
+                            "${logging.selectedFields.size} selected for next session"
                     } else {
                         "${logging.selectedFields.size} of ${WifiLogField.entries.size} fields selected"
                     },
@@ -306,11 +322,13 @@ private fun WifiLoggingPanel(
         }
         Text(
             if (logging.active) {
-                "Field selection is locked for this session. Logging records scanner changes and periodic foreground samples at the requested refresh cadence; Android may reuse evidence."
+                "Field selection and report redaction are locked for this session. Logging records scanner " +
+                    "changes and periodic foreground samples at the requested refresh cadence; Android may reuse evidence."
             } else {
                 "Choose fields, then start. The session stays in memory until cleared or the app process ends; stop it before export. " +
-                    "Safety limit: ${RedactedWifiLogRecorder.MAX_RECORDS} records or " +
-                    "${RedactedWifiLogRecorder.MAX_NETWORK_ROWS} AP rows."
+                    "The next session will be ${if (state.redactExports) "redacted" else "UNREDACTED"}. " +
+                    "Safety limit: ${WifiLogRecorder.MAX_RECORDS} records or " +
+                    "${WifiLogRecorder.MAX_NETWORK_ROWS} AP rows."
             },
             color = ScannerMuted,
             style = MaterialTheme.typography.bodySmall,
@@ -368,6 +386,7 @@ private fun WifiLoggingPanel(
 @Composable
 private fun LogFieldChooser(
     selected: Set<WifiLogField>,
+    redacted: Boolean,
     onFieldChanged: (WifiLogField, Boolean) -> Unit,
     onSetAll: (Boolean) -> Unit,
     onDismiss: () -> Unit,
@@ -379,7 +398,11 @@ private fun LogFieldChooser(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm)) {
                 Text(
-                    "Record number and elapsed time are always included. Sensitive identifiers are masked even when their fields are selected.",
+                    if (redacted) {
+                        "Record number and elapsed time are always included. Sensitive identifiers are masked."
+                    } else {
+                        "Record number and elapsed time are always included. The next session will retain selected raw identifiers in memory."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -515,7 +538,8 @@ private fun dialogContent(dialog: ToolDialog, state: OpenScannerUiState): Pair<S
     }
     ToolDialog.NEIGHBORHOOD_POSTURE -> "Neighborhood posture" to neighborhoodPostureDetails(state)
     ToolDialog.NO_SNAPSHOT -> "No snapshot to export" to
-        "Complete a nearby Wi-Fi scan first. Open Scanner will then build a redacted preview before sharing anything."
+        "Complete a nearby Wi-Fi scan first. Open Scanner will then build an exact " +
+        "${if (state.redactExports) "redacted" else "UNREDACTED"} preview before sharing anything."
     ToolDialog.MEASUREMENT_LIMITS -> "Measurement limits" to
         "Open Scanner uses passive Android scan results. Android may cache or throttle scans. " +
         "RSSI is not distance or throughput, and channel overlap is not airtime utilization. " +

@@ -21,15 +21,16 @@ The interface follows the selected dark **Field Console** direction. It prioriti
 - Android-provided physical Wi-Fi connection validation, captive-portal, link-speed, IP, gateway, and DNS evidence without mixing in a cellular default route or probing an external server.
 - A passive neighborhood posture summary with observed counts by channel group, advertised security profile, and reported Wi-Fi generation.
 - Global on-screen Privacy Mode persisted through DataStore.
-- Explicit start/stop Wi-Fi session logging with selectable fields, stable session aliases, and redacted text/JSON/CSV preview/export.
-- Redacted-by-construction snapshot and log files shared through Android's URI-grant flow; temporary cache files are cleaned after 24 hours on a later export.
+- Explicit start/stop Wi-Fi session logging with selectable fields and a report-redaction choice frozen when each session starts.
+- Redacted-by-default snapshot and text/JSON/CSV log export, with an explicit warning before enabling raw reports and an exact confirmation preview before every share.
+- Temporary exports use Android's URI-grant flow and are deleted after one hour while the app remains open or on a later app start/export.
 - No account, ads, telemetry, cloud service, analytics SDK, or `INTERNET` permission.
 
 ## Safety and privacy boundary
 
 Version 0.1 is passive. It does not join networks, collect passwords, probe local devices, run speed tests, scan ports, or contact internet endpoints. Android owns network joining and protected settings.
 
-Nearby Wi-Fi scans can reveal location context, so Android requires precise Location permission and, on many versions, the system Location switch. Open Scanner does not request GPS coordinates. Raw scan history stays in memory and disappears with the process. Session logs are also memory-only and bounded; raw SSIDs, BSSIDs, exact wall-clock times, and local addresses are transformed before a log record exists. Every export is previewed exactly before a temporary file is shared.
+Nearby Wi-Fi scans can reveal location context, so Android requires precise Location permission and, on many versions, the system Location switch. Open Scanner does not request GPS coordinates. Raw scan history stays in memory and disappears with the process. Session logs are also memory-only and bounded. Report redaction is on by default: redacted sessions transform SSIDs, BSSIDs, exact wall-clock times, and local addresses before a log record exists. Users can explicitly allow unredacted reports; new log sessions then retain only the selected raw fields in memory. Every export is labelled and previewed exactly before a temporary file is shared.
 
 See [the threat model](docs/security/threat-model.md) and [feature boundary](docs/product/full-toolkit-feature-set.md).
 
@@ -69,7 +70,7 @@ Source builds produce an unsigned release candidate. Official release artifacts,
 | `:core:model` | Immutable scan, connection, capability, and preference models |
 | `:core:domain` | Channel mapping/grouping, signal and stability classes, posture aggregation, security fallback parsing, freshness, and overlap analysis |
 | `:core:privacy` | Identifier masking and privacy transformations |
-| `:core:export` | Redacted snapshot encoders, bounded Wi-Fi log recorder, and text/JSON/CSV log encoders |
+| `:core:export` | Redacted/raw snapshot encoders, bounded Wi-Fi log recorder, and text/JSON/CSV log encoders |
 | `:data:wifi-android` | Android API adapter and the single scan coordinator |
 | `:data:settings` | DataStore-backed local preferences |
 | `docs/architecture/ui-design-system.md` | Tokenized UI design system: color/type/spacing tokens, shared components, and chart conventions |

@@ -86,6 +86,7 @@ data class WifiLoggingUiState(
     val networkRowCount: Int = 0,
     val durationMs: Long = 0L,
     val stopReason: WifiLogStopReason? = null,
+    val redacted: Boolean? = null,
 ) {
     val hasSession: Boolean get() = recordCount > 0
     val canStart: Boolean get() = selectedFields.isNotEmpty()

@@ -8,12 +8,14 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.openscanner.app.ui.OpenScannerApp
 import org.openscanner.app.ui.theme.OpenScannerTheme
 import org.openscanner.core.domain.Freshness
+import org.openscanner.core.export.ExportDocument
 import org.openscanner.core.model.PlatformCapabilities
 import org.openscanner.core.model.ScannerPhase
 import org.openscanner.core.model.WifiBand
@@ -36,6 +38,7 @@ class OpenScannerAppTest {
                     onRefresh = {},
                     onPauseChanged = {},
                     onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
                     onRefreshIntervalChanged = {},
                     onResetSettings = {},
                     onRequestPermission = {},
@@ -71,6 +74,7 @@ class OpenScannerAppTest {
                     onRefresh = {},
                     onPauseChanged = {},
                     onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
                     onRefreshIntervalChanged = {},
                     onResetSettings = {},
                     onRequestPermission = {},
@@ -108,6 +112,7 @@ class OpenScannerAppTest {
                     onRefresh = {},
                     onPauseChanged = {},
                     onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
                     onRefreshIntervalChanged = {},
                     onResetSettings = {},
                     onRequestPermission = { requested = true },
@@ -142,6 +147,7 @@ class OpenScannerAppTest {
                     onRefresh = {},
                     onPauseChanged = {},
                     onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
                     onRefreshIntervalChanged = {},
                     onResetSettings = {},
                     onRequestPermission = {},
@@ -175,6 +181,7 @@ class OpenScannerAppTest {
                     onRefresh = {},
                     onPauseChanged = {},
                     onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
                     onRefreshIntervalChanged = {},
                     onResetSettings = {},
                     onRequestPermission = {},
@@ -213,6 +220,7 @@ class OpenScannerAppTest {
                     onRefresh = {},
                     onPauseChanged = {},
                     onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
                     onRefreshIntervalChanged = {},
                     onResetSettings = {},
                     onRequestPermission = {},
@@ -257,6 +265,7 @@ class OpenScannerAppTest {
                     onRefresh = {},
                     onPauseChanged = {},
                     onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
                     onRefreshIntervalChanged = {},
                     onResetSettings = {},
                     onRequestPermission = {},
@@ -287,6 +296,90 @@ class OpenScannerAppTest {
         composeRule.onNodeWithContentDescription(
             "Wi-Fi scan throttling: OFF. Disabled in Developer options; Android may scan more often and use more battery.",
         ).assertIsDisplayed()
+    }
+
+    @Test
+    fun disablingReportRedactionRequiresExplicitConfirmation() {
+        var requested: Boolean? = null
+        composeRule.setContent {
+            OpenScannerTheme {
+                OpenScannerApp(
+                    state = liveState().copy(activeTab = AppTab.SETTINGS, redactExports = true),
+                    onTabSelected = {},
+                    onChannelGroupSelected = {},
+                    onSelectNetwork = { _, _ -> },
+                    onRefresh = {},
+                    onPauseChanged = {},
+                    onPrivacyChanged = {},
+                    onRedactExportsChanged = { requested = it },
+                    onRefreshIntervalChanged = {},
+                    onResetSettings = {},
+                    onRequestPermission = {},
+                    onOpenWifiSettings = {},
+                    onOpenLocationSettings = {},
+                    onLogFieldChanged = { _, _ -> },
+                    onSetAllLogFields = {},
+                    onStartLogging = {},
+                    onStopLogging = {},
+                    onClearLog = {},
+                    buildSnapshotExport = { null },
+                    buildLogExport = { null },
+                    shareExport = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Redact reports").performClick()
+        composeRule.onNodeWithText("Allow unredacted reports?").assertIsDisplayed()
+        assertEquals(null, requested)
+        composeRule.onNodeWithText("Allow unredacted").performClick()
+        assertEquals(false, requested)
+    }
+
+    @Test
+    fun unredactedExportHasSensitivePreviewAndExplicitShareAction() {
+        var shared = false
+        val rawDocument = ExportDocument(
+            title = "Unredacted snapshot · JSON",
+            fileName = "open-scanner-snapshot-unredacted.json",
+            mimeType = "application/json",
+            shareSubject = "Open Scanner unredacted snapshot",
+            redacted = false,
+            content = "{\"redacted\":false,\"name\":\"Secret Lab\"}",
+        )
+        composeRule.setContent {
+            OpenScannerTheme {
+                OpenScannerApp(
+                    state = liveState().copy(activeTab = AppTab.TOOLS, redactExports = false),
+                    onTabSelected = {},
+                    onChannelGroupSelected = {},
+                    onSelectNetwork = { _, _ -> },
+                    onRefresh = {},
+                    onPauseChanged = {},
+                    onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
+                    onRefreshIntervalChanged = {},
+                    onResetSettings = {},
+                    onRequestPermission = {},
+                    onOpenWifiSettings = {},
+                    onOpenLocationSettings = {},
+                    onLogFieldChanged = { _, _ -> },
+                    onSetAllLogFields = {},
+                    onStartLogging = {},
+                    onStopLogging = {},
+                    onClearLog = {},
+                    buildSnapshotExport = { rawDocument },
+                    buildLogExport = { null },
+                    shareExport = { shared = true },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Export current snapshot").performClick()
+        composeRule.onNodeWithText("JSON").performClick()
+        composeRule.onNodeWithText("UNREDACTED REPORT", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Share unredacted").performClick()
+        assertTrue(shared)
     }
 
     private fun liveState(): OpenScannerUiState = OpenScannerUiState(

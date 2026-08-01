@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -89,6 +90,7 @@ fun OpenScannerApp(
     onRefresh: () -> Unit,
     onPauseChanged: (Boolean) -> Unit,
     onPrivacyChanged: (Boolean) -> Unit,
+    onRedactExportsChanged: (Boolean) -> Unit,
     onRefreshIntervalChanged: (Int) -> Unit,
     onResetSettings: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -193,6 +195,7 @@ fun OpenScannerApp(
                 AppTab.SETTINGS -> SettingsScreen(
                     state = state,
                     onPrivacyChanged = onPrivacyChanged,
+                    onRedactExportsChanged = onRedactExportsChanged,
                     onRefreshIntervalChanged = onRefreshIntervalChanged,
                     onOpenWifiSettings = onOpenWifiSettings,
                     onResetSettings = onResetSettings,
@@ -205,7 +208,13 @@ fun OpenScannerApp(
         val previewLines = remember(preview.document.content) { preview.document.content.split('\n') }
         AlertDialog(
             onDismissRequest = { exportPreview = null },
-            icon = { Icon(Icons.Rounded.Lock, contentDescription = null, tint = ScannerCyan) },
+            icon = {
+                Icon(
+                    if (preview.document.redacted) Icons.Rounded.Lock else Icons.Rounded.WarningAmber,
+                    contentDescription = null,
+                    tint = if (preview.document.redacted) ScannerCyan else ScannerAmber,
+                )
+            },
             title = {
                 Text(
                     text = "${preview.document.title} preview",
@@ -215,9 +224,16 @@ fun OpenScannerApp(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Md)) {
                     InformationBanner(
-                        icon = Icons.Rounded.Lock,
-                        text = "This scrollable preview contains the entire exact file payload Android will share. Network names, hardware addresses, and local addresses were redacted before capture or export.",
-                        positive = true,
+                        icon = if (preview.document.redacted) Icons.Rounded.Lock else Icons.Rounded.WarningAmber,
+                        text = if (preview.document.redacted) {
+                            "This scrollable preview contains the entire exact file payload Android will share. " +
+                                "Network names, hardware addresses, and local addresses are redacted."
+                        } else {
+                            "UNREDACTED REPORT: this exact shared payload may contain network names, hardware " +
+                                "addresses, local IP addresses, gateways, DNS servers, and precise timestamps. " +
+                                "Review every line and share only with a trusted recipient."
+                        },
+                        positive = preview.document.redacted,
                     )
                     LazyColumn(
                         modifier = Modifier
@@ -243,7 +259,12 @@ fun OpenScannerApp(
                 TextButton(onClick = {
                     exportPreview = null
                     shareExport(preview.document)
-                }) { Text("Share", color = ScannerAmber) }
+                }) {
+                    Text(
+                        if (preview.document.redacted) "Share" else "Share unredacted",
+                        color = ScannerAmber,
+                    )
+                }
             },
             dismissButton = {
                 TextButton(onClick = { exportPreview = null }) { Text("Cancel", color = ScannerMuted) }

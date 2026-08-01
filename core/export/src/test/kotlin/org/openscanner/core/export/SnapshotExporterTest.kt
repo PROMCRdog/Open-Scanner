@@ -1,5 +1,6 @@
 package org.openscanner.core.export
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,6 +21,25 @@ class SnapshotExporterTest {
             assertFalse("aa:bb:cc:dd:ee:ff" in output)
             assertTrue("redacted" in output.lowercase() || "Network 1" in output)
         }
+    }
+
+    @Test
+    fun everySupportedFormatIncludesRawIdentifiersWhenExplicitlyRequested() {
+        ExportFormat.entries.forEach { format ->
+            val document = SnapshotExporter.exportDocument(fixture(), format, redacted = false)
+
+            assertFalse(document.redacted)
+            assertTrue("Secret Lab" in document.content)
+            assertTrue("aa:bb:cc:dd:ee:ff" in document.content)
+            assertTrue("unredacted" in document.fileName)
+        }
+        val json = SnapshotExporter.export(fixture(), ExportFormat.JSON, redacted = false)
+        assertTrue("\"redacted\": false" in json)
+        assertTrue("\"captured_at_epoch_ms\": 100234" in json)
+        assertEquals(
+            "Unredacted snapshot · JSON",
+            SnapshotExporter.exportDocument(fixture(), ExportFormat.JSON, redacted = false).title,
+        )
     }
 
     private fun fixture(): ScanSnapshot = ScanSnapshot(

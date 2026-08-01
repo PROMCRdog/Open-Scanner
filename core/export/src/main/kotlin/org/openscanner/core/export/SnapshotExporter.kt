@@ -10,29 +10,44 @@ enum class ExportFormat(val label: String, val extension: String, val mimeType: 
 }
 
 object SnapshotExporter {
-    fun exportRedacted(snapshot: ScanSnapshot, format: ExportFormat): String = when (format) {
-        ExportFormat.JSON -> toJson(snapshot)
-        ExportFormat.CSV -> toCsv(snapshot)
+    fun export(
+        snapshot: ScanSnapshot,
+        format: ExportFormat,
+        redacted: Boolean = true,
+    ): String = when (format) {
+        ExportFormat.JSON -> toJson(snapshot, redacted)
+        ExportFormat.CSV -> toCsv(snapshot, redacted)
     }
 
-    fun exportDocument(snapshot: ScanSnapshot, format: ExportFormat): ExportDocument = ExportDocument(
-        title = "Redacted snapshot · ${format.label}",
-        fileName = "open-scanner-snapshot-${coarsenTimestamp(snapshot.capturedAtEpochMs)}.${format.extension}",
+    fun exportRedacted(snapshot: ScanSnapshot, format: ExportFormat): String =
+        export(snapshot, format, redacted = true)
+
+    fun exportDocument(
+        snapshot: ScanSnapshot,
+        format: ExportFormat,
+        redacted: Boolean = true,
+    ): ExportDocument = ExportDocument(
+        title = "${privacyLabel(redacted)} snapshot · ${format.label}",
+        fileName = "open-scanner-snapshot${unredactedFileMarker(redacted)}-" +
+            "${exportTimestamp(snapshot.capturedAtEpochMs, redacted)}.${format.extension}",
         mimeType = format.mimeType,
-        shareSubject = "Open Scanner redacted snapshot",
-        content = exportRedacted(snapshot, format),
+        shareSubject = "Open Scanner ${privacyLabel(redacted).lowercase()} snapshot",
+        redacted = redacted,
+        content = export(snapshot, format, redacted),
     )
 
-    private fun toJson(snapshot: ScanSnapshot): String {
+    private fun toJson(snapshot: ScanSnapshot, redacted: Boolean): String {
         val networks = snapshot.observations
             .sortedBy { it.id }
-            .mapIndexed { index, observation -> PrivacyRedactor.redact(observation, index + 1) }
+            .mapIndexed { index, observation ->
+                if (redacted) PrivacyRedactor.redact(observation, index + 1) else observation
+            }
         return buildString {
             append("{\n")
             append("  \"schema\": \"open-scanner.snapshot.v1\",\n")
             append("  \"sequence\": ${snapshot.sequenceId},\n")
-            append("  \"captured_at_epoch_ms\": ${coarsenTimestamp(snapshot.capturedAtEpochMs)},\n")
-            append("  \"redacted\": true,\n")
+            append("  \"captured_at_epoch_ms\": ${exportTimestamp(snapshot.capturedAtEpochMs, redacted)},\n")
+            append("  \"redacted\": $redacted,\n")
             append("  \"limitations\": \"Passive Android scan; results may be cached or throttled\",\n")
             append("  \"networks\": [\n")
             networks.forEachIndexed { index, network ->
@@ -56,16 +71,19 @@ object SnapshotExporter {
         }
     }
 
-    private fun toCsv(snapshot: ScanSnapshot): String = buildString {
-        append("schema,sequence,captured_at_epoch_ms,name,bssid,band,channel_group,channel,frequency_mhz,footprint_center_frequency_mhz,width_mhz,rssi_dbm,security\n")
+    private fun toCsv(snapshot: ScanSnapshot, redacted: Boolean): String = buildString {
+        append("schema,sequence,captured_at_epoch_ms,redacted,name,bssid,band,channel_group,channel,frequency_mhz,footprint_center_frequency_mhz,width_mhz,rssi_dbm,security\n")
         snapshot.observations
             .sortedBy { it.id }
-            .mapIndexed { index, observation -> PrivacyRedactor.redact(observation, index + 1) }
+            .mapIndexed { index, observation ->
+                if (redacted) PrivacyRedactor.redact(observation, index + 1) else observation
+            }
             .forEach { network ->
                 val fields = listOf(
                     "open-scanner.snapshot.v1",
                     snapshot.sequenceId.toString(),
-                    coarsenTimestamp(snapshot.capturedAtEpochMs).toString(),
+                    exportTimestamp(snapshot.capturedAtEpochMs, redacted).toString(),
+                    redacted.toString(),
                     network.ssid,
                     network.bssid,
                     network.channel.band.label,
@@ -83,6 +101,13 @@ object SnapshotExporter {
     }
 
     private fun coarsenTimestamp(epochMs: Long): Long = epochMs - epochMs % 60_000L
+
+    private fun exportTimestamp(epochMs: Long, redacted: Boolean): Long =
+        if (redacted) coarsenTimestamp(epochMs) else epochMs
+
+    private fun privacyLabel(redacted: Boolean): String = if (redacted) "Redacted" else "Unredacted"
+
+    private fun unredactedFileMarker(redacted: Boolean): String = if (redacted) "" else "-unredacted"
 
     private fun escapeJson(value: String): String = buildString(value.length) {
         value.forEach { character ->

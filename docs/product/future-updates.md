@@ -54,18 +54,18 @@ The stability indicator uses explicit coarse thresholds: after at least four ass
 
 ## 3. Wi-Fi session logging
 
-**Status: implemented as a bounded, memory-only session workflow.** Tools now provides field selection, explicit start/stop, session statistics, clear/replace confirmation, an exact redacted preview, and text/JSON/CSV file export.
+**Status: implemented as a bounded, memory-only session workflow.** Tools provides field selection, explicit start/stop, session statistics, clear/replace confirmation, and text/JSON/CSV export with an exact redacted-by-default preview.
 
 Privacy and lifecycle constraints:
 
 - Record index and elapsed session time are always present; all other scan, AP, radio, security, generation, connection, link-speed, and local-address fields are individually selectable before start.
-- The field set is fixed while a session is active. Raw SSIDs/BSSIDs are converted to salted, stable session aliases and masks; IP, gateway, and DNS values are masked; wall-clock start time is reduced to minute precision before the first record exists.
+- The field set and redaction choice are fixed while a session is active. Redacted sessions convert SSIDs/BSSIDs to salted, stable session aliases, mask local addresses, and reduce wall-clock start time to minute precision before the first record exists. Explicitly unredacted sessions retain selected raw values in memory.
 - Logging consumes scanner-state changes and samples the current foreground state at the requested refresh cadence so reused evidence remains explicit. It does not create another scan loop, background service, permission, or network request.
 - A session stops at 500 state records or 25,000 AP rows. It is not a durable saved session and disappears with the app process unless the user explicitly exports it.
-- Export uses a non-exported `FileProvider` with a temporary read grant. Cache files older than 24 hours are removed when another export is prepared.
+- Export uses a non-exported `FileProvider` with a temporary read grant. Unredacted output is labelled in its payload and filename and requires an exact warning preview. Cache files are removed after one hour while the app remains open or on a later app start/export.
 
 ### Priority guidance
 
 - Finish the unfinished MVP items first (PNG export, saved sessions, aliases/favorites per the README known-limits list).
-- Establish a trusted release channel (maintainer signing identity, reproducible builds) before expanding the feature set — the release build is deliberately unsigned today.
+- Maintain the trusted release channel and permanent maintainer signing identity before expanding the feature set.
 - The **Excluded** list in `full-toolkit-feature-set.md` remains binding. Also avoid hidden-SSID correlation and vendor inference from OUI prefixes; both conflict with the rule that identifiers are never treated as identity.
