@@ -12,6 +12,9 @@ updates:
       # Core 1.19+ requires compileSdk 37. Remove this after completing the API 37 migration gate.
       - dependency-name: androidx.core:core-ktx
         versions: ["[1.19.0,)"]
+      # Lifecycle 2.11+ requires compileSdk 37. Remove this with the same migration gate.
+      - dependency-name: "androidx.lifecycle:*"
+        versions: ["[2.11.0,)"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
