@@ -20,15 +20,17 @@ import android.provider.Settings
 import androidx.core.content.ContextCompat
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.openscanner.core.domain.SecurityParser
 import org.openscanner.core.domain.WifiChannelMapper
 import org.openscanner.core.model.AccessPointObservation
@@ -39,6 +41,7 @@ import org.openscanner.core.model.ScannerPhase
 import org.openscanner.core.model.ScannerState
 import org.openscanner.core.model.SecurityType
 import org.openscanner.core.model.WifiGeneration
+import org.openscanner.core.model.WifiRefreshIntervalPolicy
 
 class AndroidWifiScanRepository(
     context: Context,
@@ -60,16 +63,16 @@ class AndroidWifiScanRepository(
 
     @Volatile
     private var paused = false
-    private var lastContentSignature: Int? = null
-    private var refreshIntervalMs = 30_000L
-    private var refreshJob: Job? = null
+    private var requestedRefreshIntervalSeconds = WifiRefreshIntervalPolicy.DEFAULT_SECONDS
+    private val cadenceController = ScanCadenceController()
+    private val cadenceWakeups = Channel<Unit>(Channel.CONFLATED)
+    private var cadenceJob: Job? = null
     private var snapshotJob: Job? = null
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 WifiManager.SCAN_RESULTS_AVAILABLE_ACTION -> refreshFromSystem(
-                    requestAccepted = null,
                     resultsUpdated = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false),
                 )
                 WifiManager.WIFI_STATE_CHANGED_ACTION -> refreshCapabilityState()
@@ -91,28 +94,22 @@ class AndroidWifiScanRepository(
             )
             receiverRegistered = true
         }
+        ensureCadenceLoop()
         refreshCapabilityState()
-        if (!paused) requestScan()
-        if (refreshJob?.isActive != true) {
-            refreshJob = scope.launch {
-                while (isActive) {
-                    delay(refreshIntervalMs)
-                    if (receiverRegistered && !paused) requestScan()
-                }
-            }
-        }
     }
 
     override fun stop() {
         val shouldUnregister = synchronized(stateLock) {
             val wasRegistered = receiverRegistered
             receiverRegistered = false
+            cadenceController.setActive(false)
             cancelSnapshotWorkLocked()
             mutableState.value = mutableState.value.copy(phase = ScannerPhase.PAUSED)
             wasRegistered
         }
-        refreshJob?.cancel()
-        refreshJob = null
+        cadenceWakeups.trySend(Unit)
+        cadenceJob?.cancel()
+        cadenceJob = null
         if (shouldUnregister) {
             runCatching { appContext.unregisterReceiver(receiver) }
         }
@@ -122,46 +119,39 @@ class AndroidWifiScanRepository(
         if (paused) {
             synchronized(stateLock) {
                 this.paused = true
+                cadenceController.setActive(false)
                 cancelSnapshotWorkLocked()
                 mutableState.value = mutableState.value.copy(phase = ScannerPhase.PAUSED)
             }
+            cadenceWakeups.trySend(Unit)
         } else {
-            this.paused = false
+            synchronized(stateLock) { this.paused = false }
             refreshCapabilityState()
-            requestScan()
         }
     }
 
     override fun setRefreshIntervalSeconds(seconds: Int) {
-        refreshIntervalMs = seconds.coerceIn(10, 60) * 1_000L
+        synchronized(stateLock) {
+            requestedRefreshIntervalSeconds = WifiRefreshIntervalPolicy.sanitize(seconds)
+            cadenceController.updateConfiguration(
+                requestedIntervalSeconds = requestedRefreshIntervalSeconds,
+            )
+        }
+        cadenceWakeups.trySend(Unit)
     }
 
     override fun refreshCapabilityState() {
-        val blockedPhase = currentBlockedPhase()
-        if (blockedPhase != null) {
-            publishUnavailable(blockedPhase)
-            return
-        }
-        if (paused) {
-            synchronized(stateLock) {
-                cancelSnapshotWorkLocked()
-                mutableState.value = mutableState.value.copy(
-                    phase = ScannerPhase.PAUSED,
-                    capabilities = platformCapabilities(),
-                    safeErrorCode = null,
-                )
-            }
-            return
-        }
-        refreshFromSystem(requestAccepted = null, resultsUpdated = null)
+        val capabilities = platformCapabilities()
+        applyCapabilityState(capabilities, currentBlockedPhase(capabilities))
     }
 
     @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
     override fun requestScan() {
-        val blockedPhase = currentBlockedPhase()
+        val capabilities = platformCapabilities()
+        val blockedPhase = currentBlockedPhase(capabilities)
         if (blockedPhase != null) {
-            publishUnavailable(blockedPhase)
+            applyCapabilityState(capabilities, blockedPhase)
             return
         }
         if (paused) {
@@ -172,24 +162,16 @@ class AndroidWifiScanRepository(
             return
         }
 
-        val accepted = runWhenScannerActive(
-            lock = stateLock,
-            isActive = { receiverRegistered && !paused },
-        ) {
-            runCatching { wifiManager?.startScan() ?: false }
-                .getOrElse {
-                    mutableState.value = mutableState.value.copy(
-                        phase = ScannerPhase.ERROR,
-                        safeErrorCode = "SCAN_REQUEST_FAILED",
-                    )
-                    false
-                }
-        } ?: return
-        refreshFromSystem(requestAccepted = accepted, resultsUpdated = null)
+        synchronized(stateLock) {
+            if (receiverRegistered && !paused) cadenceController.enqueueManualRequest()
+        }
+        cadenceWakeups.trySend(Unit)
     }
 
-    private fun currentBlockedPhase(): ScannerPhase? = when {
-        !platformCapabilities().hasWifiHardware -> ScannerPhase.UNSUPPORTED
+    private fun currentBlockedPhase(
+        capabilities: PlatformCapabilities = platformCapabilities(),
+    ): ScannerPhase? = when {
+        !capabilities.hasWifiHardware -> ScannerPhase.UNSUPPORTED
         ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_FINE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED -> ScannerPhase.PERMISSION_REQUIRED
         wifiManager?.isWifiEnabled != true -> ScannerPhase.WIFI_DISABLED
@@ -247,39 +229,147 @@ class AndroidWifiScanRepository(
         }
     }
 
+    private fun ensureCadenceLoop() {
+        synchronized(stateLock) {
+            if (cadenceJob?.isActive == true) return
+            cadenceJob = scope.launch { runCadenceLoop() }
+        }
+    }
+
+    private suspend fun runCadenceLoop() {
+        while (currentCoroutineContext().isActive) {
+            val nowElapsed = SystemClock.elapsedRealtime()
+            val wakeAtElapsed = synchronized(stateLock) {
+                cadenceController.nextWakeElapsedMs(nowElapsed)
+            }
+            if (wakeAtElapsed == null) {
+                cadenceWakeups.receive()
+                continue
+            }
+
+            val waitMs = (wakeAtElapsed - nowElapsed).coerceAtLeast(0L)
+            if (waitMs > 0L) {
+                withTimeoutOrNull(waitMs) { cadenceWakeups.receive() }
+            }
+            handleCadenceWake()
+        }
+    }
+
+    private fun handleCadenceWake() {
+        val timedOut = synchronized(stateLock) {
+            cadenceController.consumeTimeoutIfDue(SystemClock.elapsedRealtime())
+        }
+        if (timedOut) {
+            publishNonFreshCycle(
+                requestAccepted = true,
+                resultsUpdated = false,
+                safeErrorCode = null,
+            )
+        }
+
+        val shouldRequest = synchronized(stateLock) {
+            cadenceController.beginRequestIfDue(SystemClock.elapsedRealtime())
+        }
+        if (shouldRequest) executeScanRequest()
+    }
+
+    @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION")
+    private fun executeScanRequest() {
+        val capabilities = platformCapabilities()
+        val blockedPhase = currentBlockedPhase(capabilities)
+        if (blockedPhase != null) {
+            synchronized(stateLock) { cadenceController.markRequestRejected() }
+            applyCapabilityState(capabilities, blockedPhase)
+            return
+        }
+
+        val attempt = runWhenScannerActive(
+            lock = stateLock,
+            isActive = {
+                receiverRegistered && !paused && cadenceController.isActive &&
+                    cadenceController.isRequestInFlight
+            },
+        ) {
+            runCatching { wifiManager?.startScan() ?: false }
+        } ?: return
+
+        val accepted = attempt.getOrElse {
+            synchronized(stateLock) { cadenceController.markRequestRejected() }
+            publishNonFreshCycle(
+                requestAccepted = false,
+                resultsUpdated = null,
+                safeErrorCode = "SCAN_REQUEST_FAILED",
+            )
+            cadenceWakeups.trySend(Unit)
+            return
+        }
+        if (!accepted) {
+            synchronized(stateLock) { cadenceController.markRequestRejected() }
+            publishNonFreshCycle(
+                requestAccepted = false,
+                resultsUpdated = null,
+                safeErrorCode = null,
+            )
+            cadenceWakeups.trySend(Unit)
+        }
+    }
+
+    private fun applyCapabilityState(
+        capabilities: PlatformCapabilities,
+        blockedPhase: ScannerPhase?,
+    ) {
+        synchronized(stateLock) {
+            cadenceController.updateConfiguration(
+                requestedIntervalSeconds = requestedRefreshIntervalSeconds,
+                wifiScanThrottleEnabled = capabilities.wifiScanThrottleEnabled,
+            )
+            cadenceController.setActive(receiverRegistered && !paused && blockedPhase == null)
+            if (blockedPhase != null || paused) cancelSnapshotWorkLocked()
+
+            val previous = mutableState.value
+            mutableState.value = previous.copy(
+                phase = when {
+                    blockedPhase != null -> blockedPhase
+                    paused -> ScannerPhase.PAUSED
+                    previous.snapshot != null -> ScannerPhase.LIVE
+                    else -> ScannerPhase.CHECKING
+                },
+                capabilities = capabilities,
+                safeErrorCode = null,
+            )
+        }
+        cadenceWakeups.trySend(Unit)
+    }
+
     @SuppressLint("MissingPermission")
     private fun refreshFromSystem(
-        requestAccepted: Boolean?,
-        resultsUpdated: Boolean?,
+        resultsUpdated: Boolean,
     ) {
+        val requestAccepted = synchronized(stateLock) {
+            val accepted = true.takeIf { cadenceController.isRequestInFlight }
+            cadenceController.markScanCompleted()
+            accepted
+        }
+        val capabilities = platformCapabilities()
+        val blockedPhase = currentBlockedPhase(capabilities)
+        applyCapabilityState(capabilities, blockedPhase)
+        if (blockedPhase != null) return
+
         val generation = synchronized(stateLock) {
             cancelSnapshotWorkLocked()
             snapshotGeneration.get()
-        }
-        val blockedPhase = currentBlockedPhase()
-        if (blockedPhase != null) {
-            synchronized(stateLock) {
-                if (generation == snapshotGeneration.get() && receiverRegistered && !paused) {
-                    mutableState.value = mutableState.value.copy(
-                        phase = blockedPhase,
-                        capabilities = platformCapabilities(),
-                    )
-                }
-            }
-            return
         }
 
         val job = scope.launch {
             val scanResults = runCatching { wifiManager?.scanResults.orEmpty() }
                 .getOrElse {
-                    synchronized(stateLock) {
-                        if (generation == snapshotGeneration.get() && receiverRegistered && !paused) {
-                            mutableState.value = mutableState.value.copy(
-                                phase = ScannerPhase.ERROR,
-                                safeErrorCode = "SCAN_RESULTS_UNAVAILABLE",
-                            )
-                        }
-                    }
+                    publishNonFreshCycle(
+                        requestAccepted = requestAccepted,
+                        resultsUpdated = false,
+                        safeErrorCode = "SCAN_RESULTS_UNAVAILABLE",
+                    )
+                    cadenceWakeups.trySend(Unit)
                     return@launch
                 }
             val connection = readConnectionEvidence()
@@ -290,25 +380,24 @@ class AndroidWifiScanRepository(
                         .thenByDescending { it.rssiDbm }
                         .thenBy { it.ssid.lowercase() },
                 )
-            val signature = observations.fold(17) { accumulator, observation ->
-                31 * accumulator + observation.id.hashCode() +
-                    observation.rssiDbm + observation.timestampMicros.hashCode()
-            }
             synchronized(stateLock) {
                 if (generation != snapshotGeneration.get() || !receiverRegistered || paused) return@launch
                 val previousSnapshot = mutableState.value.snapshot
-                val reused = lastContentSignature != null && lastContentSignature == signature
-                val likelyThrottled = requestAccepted == false || resultsUpdated == false || reused
-                val snapshot = if (reused && previousSnapshot != null) {
+                val fresh = hasFreshScanEvidence(
+                    previous = previousSnapshot,
+                    observations = observations,
+                    resultsUpdated = resultsUpdated,
+                )
+                val snapshot = if (!fresh && previousSnapshot != null) {
                     refreshReusedSnapshot(
                         previous = previousSnapshot,
                         observations = observations,
                         connection = connection,
                         requestAccepted = requestAccepted,
                         resultsUpdated = resultsUpdated,
-                        likelyThrottled = likelyThrottled,
+                        likelyThrottled = true,
                     )
-                } else {
+                } else if (fresh) {
                     val nowElapsed = SystemClock.elapsedRealtime()
                     ScanSnapshot(
                         sequenceId = sequence.incrementAndGet(),
@@ -317,15 +406,16 @@ class AndroidWifiScanRepository(
                         sourceTimestampMicros = observations.maxOfOrNull { it.timestampMicros }?.takeIf { it > 0L },
                         requestAccepted = requestAccepted,
                         resultsUpdated = resultsUpdated,
-                        likelyThrottled = likelyThrottled,
+                        likelyThrottled = false,
                         observations = observations,
                         connection = connection,
                     )
+                } else {
+                    null
                 }
-                lastContentSignature = signature
                 mutableState.value = ScannerState(
                     phase = ScannerPhase.LIVE,
-                    capabilities = platformCapabilities(),
+                    capabilities = capabilities,
                     snapshot = snapshot,
                     safeErrorCode = null,
                 )
@@ -337,6 +427,45 @@ class AndroidWifiScanRepository(
             } else {
                 job.cancel()
             }
+        }
+        cadenceWakeups.trySend(Unit)
+    }
+
+    private fun publishNonFreshCycle(
+        requestAccepted: Boolean?,
+        resultsUpdated: Boolean?,
+        safeErrorCode: String?,
+    ) {
+        val generation = synchronized(stateLock) { snapshotGeneration.get() }
+        val previous = synchronized(stateLock) { mutableState.value.snapshot }
+        val connection = previous?.let {
+            runCatching { readConnectionEvidence() }.getOrDefault(it.connection)
+        }
+        synchronized(stateLock) {
+            if (generation != snapshotGeneration.get() || !receiverRegistered || paused) return
+            val current = mutableState.value
+            val previousSnapshot = current.snapshot
+            val refreshedSnapshot = if (previousSnapshot != null && connection != null) {
+                refreshReusedSnapshot(
+                    previous = previousSnapshot,
+                    observations = previousSnapshot.observations.withConnectionMarker(connection.bssid),
+                    connection = connection,
+                    requestAccepted = requestAccepted,
+                    resultsUpdated = resultsUpdated,
+                    likelyThrottled = true,
+                )
+            } else {
+                previousSnapshot
+            }
+            mutableState.value = current.copy(
+                phase = when {
+                    safeErrorCode != null -> ScannerPhase.ERROR
+                    refreshedSnapshot != null -> ScannerPhase.LIVE
+                    else -> current.phase
+                },
+                snapshot = refreshedSnapshot,
+                safeErrorCode = safeErrorCode,
+            )
         }
     }
 
@@ -427,20 +556,6 @@ class AndroidWifiScanRepository(
             gateway = defaultGateway,
             dnsServers = linkProperties?.dnsServers.orEmpty().mapNotNull { it.hostAddress },
         )
-    }
-
-    private fun publishUnavailable(phase: ScannerPhase) {
-        runWhenScannerActive(
-            lock = stateLock,
-            isActive = { receiverRegistered && !paused },
-        ) {
-            cancelSnapshotWorkLocked()
-            mutableState.value = mutableState.value.copy(
-                phase = phase,
-                capabilities = platformCapabilities(),
-                safeErrorCode = null,
-            )
-        }
     }
 
     private data class WifiNetworkCandidate(
@@ -534,12 +649,35 @@ internal fun refreshReusedSnapshot(
     resultsUpdated: Boolean?,
     likelyThrottled: Boolean,
 ): ScanSnapshot = previous.copy(
-    requestAccepted = requestAccepted ?: previous.requestAccepted,
-    resultsUpdated = resultsUpdated ?: previous.resultsUpdated,
-    likelyThrottled = previous.likelyThrottled || likelyThrottled,
+    requestAccepted = requestAccepted,
+    resultsUpdated = resultsUpdated,
+    likelyThrottled = likelyThrottled,
     observations = observations,
     connection = connection,
 )
+
+internal fun hasFreshScanEvidence(
+    previous: ScanSnapshot?,
+    observations: List<AccessPointObservation>,
+    resultsUpdated: Boolean,
+): Boolean {
+    if (!resultsUpdated) return false
+    if (observations.isEmpty()) {
+        return previous == null || previous.observations.isNotEmpty()
+    }
+    val newestTimestamp = observations.maxOfOrNull { it.timestampMicros }?.takeIf { it > 0L }
+        ?: return false
+    val previousTimestamp = previous?.sourceTimestampMicros
+    return previousTimestamp == null || newestTimestamp > previousTimestamp
+}
+
+private fun List<AccessPointObservation>.withConnectionMarker(
+    connectedBssid: String?,
+): List<AccessPointObservation> = map { observation ->
+    observation.copy(
+        isConnected = connectedBssid?.equals(observation.bssid, ignoreCase = true) == true,
+    )
+}
 
 internal fun choosePhysicalWifiCandidateIndex(
     candidateBssids: List<String?>,

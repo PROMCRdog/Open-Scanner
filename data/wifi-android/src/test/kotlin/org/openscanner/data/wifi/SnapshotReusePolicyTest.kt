@@ -41,6 +41,77 @@ class SnapshotReusePolicyTest {
         assertEquals(previous.sequenceId, refreshed.sequenceId)
     }
 
+    @Test
+    fun latestCycleFlagsReplaceStickyThrottleEvidence() {
+        val previous = snapshot(
+            observations = listOf(observation(id = "old", connected = true)),
+            connection = connection(bssid = "old"),
+        ).copy(
+            requestAccepted = false,
+            resultsUpdated = false,
+            likelyThrottled = true,
+        )
+
+        val refreshed = refreshReusedSnapshot(
+            previous = previous,
+            observations = previous.observations,
+            connection = previous.connection,
+            requestAccepted = null,
+            resultsUpdated = true,
+            likelyThrottled = false,
+        )
+
+        assertEquals(null, refreshed.requestAccepted)
+        assertTrue(refreshed.resultsUpdated == true)
+        assertFalse(refreshed.likelyThrottled)
+        assertEquals(previous.sequenceId, refreshed.sequenceId)
+        assertEquals(previous.capturedAtElapsedMs, refreshed.capturedAtElapsedMs)
+        assertEquals(previous.sourceTimestampMicros, refreshed.sourceTimestampMicros)
+    }
+
+    @Test
+    fun onlySuccessfulBroadcastWithNewSourceTimestampIsFresh() {
+        val previous = snapshot(
+            observations = listOf(observation(id = "old", connected = true)),
+            connection = connection(bssid = "old"),
+        )
+
+        assertFalse(
+            hasFreshScanEvidence(
+                previous = previous,
+                observations = listOf(observation(id = "new", connected = false).copy(timestampMicros = 2_000)),
+                resultsUpdated = false,
+            ),
+        )
+        assertFalse(
+            hasFreshScanEvidence(
+                previous = previous,
+                observations = listOf(observation(id = "new", connected = false)),
+                resultsUpdated = true,
+            ),
+        )
+        assertTrue(
+            hasFreshScanEvidence(
+                previous = previous,
+                observations = listOf(observation(id = "new", connected = false).copy(timestampMicros = 2_000)),
+                resultsUpdated = true,
+            ),
+        )
+    }
+
+    @Test
+    fun successfulEmptyResultIsFreshOnlyWhenItIsNewlyEmpty() {
+        val nonEmpty = snapshot(
+            observations = listOf(observation(id = "old", connected = true)),
+            connection = connection(bssid = "old"),
+        )
+        val empty = nonEmpty.copy(observations = emptyList(), sourceTimestampMicros = null)
+
+        assertTrue(hasFreshScanEvidence(nonEmpty, emptyList(), resultsUpdated = true))
+        assertFalse(hasFreshScanEvidence(empty, emptyList(), resultsUpdated = true))
+        assertFalse(hasFreshScanEvidence(nonEmpty, emptyList(), resultsUpdated = false))
+    }
+
     private fun observation(id: String, connected: Boolean) = AccessPointObservation(
         id = id,
         ssid = id,
