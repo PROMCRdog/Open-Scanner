@@ -4,6 +4,8 @@
 
 Open Scanner is a local-first, open-source Wi-Fi analysis toolkit for Android. It turns Android's passive scan results into a clear five-tab workflow: **Scan**, **Track**, **Spectrum**, **Tools**, and **Settings**.
 
+Version 0.1.0 is an early public release: its automated privacy/build gates, permanent signature, exact-artifact verification, and bounded physical-device smoke test passed. It is not yet broad API 26–36 device or manual accessibility/performance certification. The assurance levels and remaining validation are public in [ADR 0003](docs/adr/0003-early-public-release-policy.md) and the [release checklist](docs/release/v0.1.0-checklist.md).
+
 The interface follows the selected dark **Field Console** direction. It prioritizes legibility, labelled controls, explicit freshness, and honest unavailable states over maximum data density. The channel spectrum from the alternate design is preserved as a dedicated top-level tab.
 
 ![Track interface with labelled axes, units, and a text-and-shape legend](docs/assets/track-screen.png)
