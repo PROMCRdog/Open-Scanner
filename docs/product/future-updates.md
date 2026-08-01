@@ -2,7 +2,7 @@
 
 Date: 2026-07-31
 
-Implementation update: 2026-08-01
+Implementation update: 2026-08-02
 
 This document tracks agreed follow-on feature work and its implementation status. Each entry preserves the decision and constraints so completed and deferred updates remain traceable without re-deriving the rationale. Feasibility labels follow `full-toolkit-feature-set.md` (Stock / Constrained / Optional / Privileged / Excluded).
 
@@ -46,7 +46,7 @@ All are **Stock** — pure transformations of data the app already holds, with n
 | AP stability / flapping indicator | **Implemented** | Derives a selected AP's RSSI range and absence share from up to 60 recent changed snapshots. Leading snapshots before first observation are excluded, and fewer than four assessed snapshots remain "Insufficient history." | Answers the roadmap's "how stable are they" question without presenting stability as throughput or connection quality. |
 | Snapshot diff view | Deferred | Show what changed between refreshes or since app start: new APs, gone APs, channel changes. | Pure transformation of coordinator snapshots; useful for spotting router reboots or new hotspots. |
 | Demo / fixture mode | Deferred | A synthetic scan-data source for screenshots, store listings, and CI UI tests. | Privacy-by-construction QA/marketing material (no real identifiers); makes throttle/stale/error states testable without hardware. |
-| Localization | Deferred | Externalize strings and translate. | Not covered by any existing doc; cheapest to do before the string count grows. |
+| Localization | **Implemented** | User-facing Compose copy is externalized with English and Simplified Chinese (`zh-CN`) resources; the README is maintained in both languages. | Landed before v0.2.0 so new fast-refresh copy follows the same resource workflow. |
 | Neighborhood posture summary | **Implemented** | A passive Tools summary counts observed APs by validated channel group, advertised security profile, and reported Wi-Fi generation. | Uses only already-parsed data and explicitly avoids identity, safety, or airtime claims. |
 | 6 GHz PSC highlighting | Deferred | Mark PSC channels on the Spectrum tab. | PSC channels are a fixed standard set, not a regulatory guess, so this stays within the regulatory-uncertainty rule. |
 
@@ -69,3 +69,11 @@ Privacy and lifecycle constraints:
 - Finish the unfinished MVP items first (PNG export, saved sessions, aliases/favorites per the README known-limits list).
 - Maintain the trusted release channel and permanent maintainer signing identity before expanding the feature set.
 - The **Excluded** list in `full-toolkit-feature-set.md` remains binding. Also avoid hidden-SSID correlation and vendor inference from OUI prefixes; both conflict with the rule that identifiers are never treated as identity.
+
+## 4. Conditional five-second foreground refresh
+
+**Status: accepted for the v0.2.0 candidate; implementation and release verification are tracked in the [v0.2.0 checklist](../release/v0.2.0-checklist.md).**
+
+Add a **5 s request mode** alongside 10, 15, 30, and 60 seconds. It is available only after Android explicitly reports that Wi-Fi scan throttling is off; enabled or unavailable capability states disable it. If a persisted five-second choice later becomes ineligible, the app waits for capability discovery to finish, then persists and schedules the 30-second default.
+
+The mode remains foreground-only and uses the existing single scan coordinator. It permits one in-flight request, coalesces manual refresh, times stalled requests out after 15 seconds, and advances histories only for fresh platform timestamps or a successful newly empty result. It does not add a one-second mode, permission, `INTERNET` access, background service, or second scan loop. Five seconds is a best-effort request cadence, not a guarantee of fresh hardware measurements; UI copy must expose actual source age and warn about battery and OEM limits. The full decision is recorded in [ADR 0004](../adr/0004-conditional-fast-scan-cadence.md).

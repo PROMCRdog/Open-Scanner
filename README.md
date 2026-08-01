@@ -6,7 +6,7 @@ English | [简体中文](README.zh-CN.md)
 
 Open Scanner is a local-first, open-source Wi-Fi analysis toolkit for Android. It turns Android's passive scan results into a clear five-tab workflow: **Scan**, **Track**, **Spectrum**, **Tools**, and **Settings**.
 
-Version 0.1.0 is an early public release: its automated privacy/build gates, permanent signature, exact-artifact verification, and bounded physical-device smoke test passed. It is not yet broad API 26–36 device or manual accessibility/performance certification. The assurance levels and remaining validation are public in [ADR 0003](docs/adr/0003-early-public-release-policy.md) and the [release checklist](docs/release/v0.1.0-checklist.md).
+Version 0.1.0 is an early public release: its automated privacy/build gates, permanent signature, exact-artifact verification, and bounded physical-device smoke test passed. It is not yet broad API 26–36 device or manual accessibility/performance certification. The v0.2.0 development line adds a truthful conditional five-second request mode; its implementation and device validation must pass the separate [v0.2.0 checklist](docs/release/v0.2.0-checklist.md) before release. Assurance policy remains defined by [ADR 0003](docs/adr/0003-early-public-release-policy.md).
 
 The interface follows the selected dark **Field Console** direction. It prioritizes legibility, labelled controls, explicit freshness, and honest unavailable states over maximum data density. The channel spectrum from the alternate design is preserved as a dedicated top-level tab.
 
@@ -18,6 +18,7 @@ The interface follows the selected dark **Field Console** direction. It prioriti
 - Nearby access-point inventory with channel-validated 2.4, 5.2, 5.5/DFS, 5.8, 6 GHz, and unsupported-frequency groups.
 - SSID, BSSID, signal, channel, frequency, width, security, Wi-Fi generation, and a highlighted current-system Wi-Fi marker when Android exposes connection evidence.
 - Search, strength-first sorting, explicit refresh, cached/throttled-result warning, read-only Android scan-throttle status, and distinct permission/Wi-Fi/Location/device error states.
+- Requested intervals of 5, 10, 15, 30, and 60 seconds. **5 s request mode** is foreground-only and available only when Android explicitly reports scan throttling off; it shows actual source age and never turns cached data into a new sample.
 - A selected-AP tracker with a timestamp-scaled, bounded 60-sample, memory-only signal history and a visible gap when the latest evidence is no longer current.
 - A recent-snapshot stability indicator that reports RSSI range and observed absence share instead of requiring users to infer flapping from the graph.
 - A dedicated Canvas spectrum graph showing up to four emphasized networks and an accessible text equivalent; unknown channel widths stay visibly unknown instead of becoming invented 20 MHz footprints.
@@ -32,7 +33,7 @@ The interface follows the selected dark **Field Console** direction. It prioriti
 
 ## Safety and privacy boundary
 
-Version 0.1 is passive. It does not join networks, collect passwords, probe local devices, run speed tests, scan ports, or contact internet endpoints. Android owns network joining and protected settings.
+Version 0.2 remains passive. It does not join networks, collect passwords, probe local devices, run speed tests, scan ports, or contact internet endpoints. Android owns network joining and protected settings. Faster requests add no background service, permission, or `INTERNET` access and stop when the app is not foreground-visible.
 
 Nearby Wi-Fi scans can reveal location context, so Android requires precise Location permission and, on many versions, the system Location switch. Open Scanner does not request GPS coordinates. Raw scan history stays in memory and disappears with the process. Session logs are also memory-only and bounded. Report redaction is on by default: redacted sessions transform SSIDs, BSSIDs, exact wall-clock times, and local addresses before a log record exists. Users can explicitly allow unredacted reports; new log sessions then retain only the selected raw fields in memory. Every export is labelled and previewed exactly before a temporary file is shared.
 
@@ -83,12 +84,13 @@ Architecture details are in [docs/architecture/native-app.md](docs/architecture/
 
 ## Known limits
 
-- Android can throttle or reuse Wi-Fi scan results; Refresh is a request, not a guaranteed radio scan.
+- Android can throttle, reject, delay, or reuse Wi-Fi scan results. Even with Developer Options scan throttling disabled, **5 s** is a request cadence—not a guaranteed five-second radio measurement—and can increase battery use.
+- Five-second mode automatically resets to the 30-second default if Android later reports throttling enabled or its state is unavailable. Version 0.2.0 has no one-second mode and no background scanning.
 - RSSI is not distance, speed, occupancy, identity, or safety.
 - Passive overlap is not airtime utilization and cannot guarantee a legal or optimal router channel.
 - Hardware, OS version, permissions, access-point beacons, and OEM behavior determine which fields are available.
 - Session logs are not durable saved sessions: they end with the app process and are capped at 500 state records or 25,000 AP rows.
-- PNG export, encrypted saved-session history/comparison, aliases/favorites, snapshot diff, demo mode, localization, 6 GHz PSC highlighting, active DNS/HTTP tests, LAN discovery, and throughput tests remain future work.
+- PNG export, encrypted saved-session history/comparison, aliases/favorites, snapshot diff, demo mode, 6 GHz PSC highlighting, active DNS/HTTP tests, LAN discovery, and throughput tests remain future work.
 
 ## Contributing and security
 
