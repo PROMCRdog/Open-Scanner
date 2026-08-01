@@ -2,7 +2,7 @@
 agp = "9.3.1"
 kotlin = "2.3.21"
 activity = "1.13.0"
-androidx-core = "1.17.0"
+androidx-core = "1.19.0"
 compose-bom = "2026.06.00"
 coroutines = "1.10.2"
 datastore = "1.2.1"
