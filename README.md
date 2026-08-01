@@ -1,0 +1,94 @@
+# Open Scanner
+
+[![CI](https://github.com/PROMCRdog/Open-Scanner/actions/workflows/ci.yml/badge.svg)](https://github.com/PROMCRdog/Open-Scanner/actions/workflows/ci.yml)
+
+Open Scanner is a local-first, open-source Wi-Fi analysis toolkit for Android. It turns Android's passive scan results into a clear five-tab workflow: **Scan**, **Track**, **Spectrum**, **Tools**, and **Settings**.
+
+The interface follows the selected dark **Field Console** direction. It prioritizes legibility, labelled controls, explicit freshness, and honest unavailable states over maximum data density. The channel spectrum from the alternate design is preserved as a dedicated top-level tab.
+
+![Track interface with labelled axes, units, and a text-and-shape legend](docs/assets/track-screen.png)
+
+## Current development scope
+
+- One application-scoped scan coordinator; screens never create competing scan loops.
+- Nearby access-point inventory with channel-validated 2.4, 5.2, 5.5/DFS, 5.8, 6 GHz, and unsupported-frequency groups.
+- SSID, BSSID, signal, channel, frequency, width, security, Wi-Fi generation, and connected-state evidence when Android exposes them.
+- Search, strength-first sorting, explicit refresh, cached/throttled-result warning, and distinct permission/Wi-Fi/Location/device error states.
+- A selected-AP tracker with a timestamp-scaled, bounded 60-sample, memory-only signal history and a visible gap when the latest evidence is no longer current.
+- A recent-snapshot stability indicator that reports RSSI range and observed absence share instead of requiring users to infer flapping from the graph.
+- A dedicated Canvas spectrum graph showing up to four emphasized networks and an accessible text equivalent; unknown channel widths stay visibly unknown instead of becoming invented 20 MHz footprints.
+- Observed co-channel/overlap analysis that does not pretend to know legal router channels or airtime utilization.
+- Android-provided physical Wi-Fi connection validation, captive-portal, link-speed, IP, gateway, and DNS evidence without mixing in a cellular default route or probing an external server.
+- A passive neighborhood posture summary with observed counts by channel group, advertised security profile, and reported Wi-Fi generation.
+- Global on-screen Privacy Mode persisted through DataStore.
+- Explicit start/stop Wi-Fi session logging with selectable fields, stable session aliases, and redacted text/JSON/CSV preview/export.
+- Redacted-by-construction snapshot and log files shared through Android's URI-grant flow; temporary cache files are cleaned after 24 hours on a later export.
+- No account, ads, telemetry, cloud service, analytics SDK, or `INTERNET` permission.
+
+## Safety and privacy boundary
+
+Version 0.1 is passive. It does not join networks, collect passwords, probe local devices, run speed tests, scan ports, or contact internet endpoints. Android owns network joining and protected settings.
+
+Nearby Wi-Fi scans can reveal location context, so Android requires precise Location permission and, on many versions, the system Location switch. Open Scanner does not request GPS coordinates. Raw scan history stays in memory and disappears with the process. Session logs are also memory-only and bounded; raw SSIDs, BSSIDs, exact wall-clock times, and local addresses are transformed before a log record exists. Every export is previewed exactly before a temporary file is shared.
+
+See [the threat model](docs/security/threat-model.md) and [feature boundary](docs/product/full-toolkit-feature-set.md).
+
+## Build
+
+Requirements:
+
+- JDK 17
+- Android SDK Platform 36.1 and Build Tools 36.0.0 or newer compatible 36.x tools
+- ADB for physical-device testing
+
+The wrapper and dependency versions are pinned. From the repository root:
+
+Configure JDK 17 and Android SDK Platform 36.1 through Android Studio or the
+standard `JAVA_HOME` and `ANDROID_HOME` environment variables, then run:
+
+```bash
+./gradlew --dependency-verification=strict test :app:assembleDebug :app:assembleDebugAndroidTest
+./gradlew --dependency-verification=strict :app:lintRelease :app:assembleRelease
+```
+
+Install the debug APK only on a device you control:
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Some Xiaomi/HyperOS devices independently require the developer option **Install via USB**. Open Scanner's build does not bypass that device-side safeguard.
+
+Source builds produce an unsigned release candidate. Official release artifacts, when published, are signed through a private maintainer process. Use debug APKs only for local device QA; never distribute them as production releases.
+
+## Project layout
+
+| Module | Responsibility |
+|---|---|
+| `:app` | Compose UI, activity, state mapping, and manual application graph |
+| `:core:model` | Immutable scan, connection, capability, and preference models |
+| `:core:domain` | Channel mapping/grouping, signal and stability classes, posture aggregation, security fallback parsing, freshness, and overlap analysis |
+| `:core:privacy` | Identifier masking and privacy transformations |
+| `:core:export` | Redacted snapshot encoders, bounded Wi-Fi log recorder, and text/JSON/CSV log encoders |
+| `:data:wifi-android` | Android API adapter and the single scan coordinator |
+| `:data:settings` | DataStore-backed local preferences |
+| `docs/architecture/ui-design-system.md` | Tokenized UI design system: color/type/spacing tokens, shared components, and chart conventions |
+
+Architecture details are in [docs/architecture/native-app.md](docs/architecture/native-app.md).
+
+## Known limits
+
+- Android can throttle or reuse Wi-Fi scan results; Refresh is a request, not a guaranteed radio scan.
+- RSSI is not distance, speed, occupancy, identity, or safety.
+- Passive overlap is not airtime utilization and cannot guarantee a legal or optimal router channel.
+- Hardware, OS version, permissions, access-point beacons, and OEM behavior determine which fields are available.
+- Session logs are not durable saved sessions: they end with the app process and are capped at 500 state records or 25,000 AP rows.
+- PNG export, encrypted saved-session history/comparison, aliases/favorites, snapshot diff, demo mode, localization, 6 GHz PSC highlighting, active DNS/HTTP tests, LAN discovery, and throughput tests remain future work.
+
+## Contributing and security
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [GOVERNANCE.md](GOVERNANCE.md), [SUPPORT.md](SUPPORT.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) before opening work publicly. Never attach raw SSIDs, BSSIDs, IP addresses, or unredacted screenshots to a bug report.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).

@@ -1,0 +1,531 @@
+package org.openscanner.data.wifi
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.wifi.ScanResult
+import android.net.wifi.WifiInfo
+import android.net.wifi.WifiManager
+import android.os.Build
+import android.os.SystemClock
+import androidx.core.content.ContextCompat
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import org.openscanner.core.domain.SecurityParser
+import org.openscanner.core.domain.WifiChannelMapper
+import org.openscanner.core.model.AccessPointObservation
+import org.openscanner.core.model.ConnectionEvidence
+import org.openscanner.core.model.PlatformCapabilities
+import org.openscanner.core.model.ScanSnapshot
+import org.openscanner.core.model.ScannerPhase
+import org.openscanner.core.model.ScannerState
+import org.openscanner.core.model.SecurityType
+import org.openscanner.core.model.WifiGeneration
+
+class AndroidWifiScanRepository(
+    context: Context,
+) : WifiScanRepository {
+    private val appContext = context.applicationContext
+    private val wifiManager = appContext.getSystemService(WifiManager::class.java)
+    private val connectivityManager = appContext.getSystemService(ConnectivityManager::class.java)
+    private val locationManager = appContext.getSystemService(LocationManager::class.java)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val sequence = AtomicLong(0L)
+    private val snapshotGeneration = AtomicLong(0L)
+    private val stateLock = Any()
+    private val mutableState = MutableStateFlow(ScannerState())
+
+    override val state: StateFlow<ScannerState> = mutableState.asStateFlow()
+
+    @Volatile
+    private var receiverRegistered = false
+
+    @Volatile
+    private var paused = false
+    private var lastContentSignature: Int? = null
+    private var refreshIntervalMs = 30_000L
+    private var refreshJob: Job? = null
+    private var snapshotJob: Job? = null
+
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                WifiManager.SCAN_RESULTS_AVAILABLE_ACTION -> refreshFromSystem(
+                    requestAccepted = null,
+                    resultsUpdated = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false),
+                )
+                WifiManager.WIFI_STATE_CHANGED_ACTION -> refreshCapabilityState()
+            }
+        }
+    }
+
+    override fun start() {
+        if (!receiverRegistered) {
+            val filter = IntentFilter().apply {
+                addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+                addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
+            }
+            ContextCompat.registerReceiver(
+                appContext,
+                receiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            receiverRegistered = true
+        }
+        refreshCapabilityState()
+        if (!paused) requestScan()
+        if (refreshJob?.isActive != true) {
+            refreshJob = scope.launch {
+                while (isActive) {
+                    delay(refreshIntervalMs)
+                    if (receiverRegistered && !paused) requestScan()
+                }
+            }
+        }
+    }
+
+    override fun stop() {
+        val shouldUnregister = synchronized(stateLock) {
+            val wasRegistered = receiverRegistered
+            receiverRegistered = false
+            cancelSnapshotWorkLocked()
+            mutableState.value = mutableState.value.copy(phase = ScannerPhase.PAUSED)
+            wasRegistered
+        }
+        refreshJob?.cancel()
+        refreshJob = null
+        if (shouldUnregister) {
+            runCatching { appContext.unregisterReceiver(receiver) }
+        }
+    }
+
+    override fun setPaused(paused: Boolean) {
+        if (paused) {
+            synchronized(stateLock) {
+                this.paused = true
+                cancelSnapshotWorkLocked()
+                mutableState.value = mutableState.value.copy(phase = ScannerPhase.PAUSED)
+            }
+        } else {
+            this.paused = false
+            refreshCapabilityState()
+            requestScan()
+        }
+    }
+
+    override fun setRefreshIntervalSeconds(seconds: Int) {
+        refreshIntervalMs = seconds.coerceIn(10, 60) * 1_000L
+    }
+
+    override fun refreshCapabilityState() {
+        val blockedPhase = currentBlockedPhase()
+        if (blockedPhase != null) {
+            publishUnavailable(blockedPhase)
+            return
+        }
+        if (paused) {
+            synchronized(stateLock) {
+                cancelSnapshotWorkLocked()
+                mutableState.value = mutableState.value.copy(
+                    phase = ScannerPhase.PAUSED,
+                    capabilities = platformCapabilities(),
+                    safeErrorCode = null,
+                )
+            }
+            return
+        }
+        refreshFromSystem(requestAccepted = null, resultsUpdated = null)
+    }
+
+    @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION")
+    override fun requestScan() {
+        val blockedPhase = currentBlockedPhase()
+        if (blockedPhase != null) {
+            publishUnavailable(blockedPhase)
+            return
+        }
+        if (paused) {
+            synchronized(stateLock) {
+                cancelSnapshotWorkLocked()
+                mutableState.value = mutableState.value.copy(phase = ScannerPhase.PAUSED)
+            }
+            return
+        }
+
+        val accepted = runWhenScannerActive(
+            lock = stateLock,
+            isActive = { receiverRegistered && !paused },
+        ) {
+            runCatching { wifiManager?.startScan() ?: false }
+                .getOrElse {
+                    mutableState.value = mutableState.value.copy(
+                        phase = ScannerPhase.ERROR,
+                        safeErrorCode = "SCAN_REQUEST_FAILED",
+                    )
+                    false
+                }
+        } ?: return
+        refreshFromSystem(requestAccepted = accepted, resultsUpdated = null)
+    }
+
+    private fun currentBlockedPhase(): ScannerPhase? = when {
+        !platformCapabilities().hasWifiHardware -> ScannerPhase.UNSUPPORTED
+        ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_FINE_LOCATION) !=
+            PackageManager.PERMISSION_GRANTED -> ScannerPhase.PERMISSION_REQUIRED
+        wifiManager?.isWifiEnabled != true -> ScannerPhase.WIFI_DISABLED
+        !isLocationEnabled() -> ScannerPhase.LOCATION_DISABLED
+        else -> null
+    }
+
+    private fun platformCapabilities(): PlatformCapabilities {
+        val hasWifi = appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI) &&
+            wifiManager != null
+        return PlatformCapabilities(
+            hasWifiHardware = hasWifi,
+            supports5Ghz = hasWifi && runCatching { wifiManager?.is5GHzBandSupported == true }.getOrDefault(false),
+            supports6Ghz = hasWifi && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                runCatching { wifiManager?.is6GHzBandSupported == true }.getOrDefault(false),
+        )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isLocationEnabled(): Boolean {
+        val manager = locationManager ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            manager.isLocationEnabled
+        } else {
+            runCatching {
+                manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                    manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+            }.getOrDefault(false)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun refreshFromSystem(
+        requestAccepted: Boolean?,
+        resultsUpdated: Boolean?,
+    ) {
+        val generation = synchronized(stateLock) {
+            cancelSnapshotWorkLocked()
+            snapshotGeneration.get()
+        }
+        val blockedPhase = currentBlockedPhase()
+        if (blockedPhase != null) {
+            synchronized(stateLock) {
+                if (generation == snapshotGeneration.get() && receiverRegistered && !paused) {
+                    mutableState.value = mutableState.value.copy(
+                        phase = blockedPhase,
+                        capabilities = platformCapabilities(),
+                    )
+                }
+            }
+            return
+        }
+
+        val job = scope.launch {
+            val scanResults = runCatching { wifiManager?.scanResults.orEmpty() }
+                .getOrElse {
+                    synchronized(stateLock) {
+                        if (generation == snapshotGeneration.get() && receiverRegistered && !paused) {
+                            mutableState.value = mutableState.value.copy(
+                                phase = ScannerPhase.ERROR,
+                                safeErrorCode = "SCAN_RESULTS_UNAVAILABLE",
+                            )
+                        }
+                    }
+                    return@launch
+                }
+            val connection = readConnectionEvidence()
+            val observations = scanResults
+                .map { it.toObservation(connection.bssid) }
+                .sortedWith(
+                    compareByDescending<AccessPointObservation> { it.isConnected }
+                        .thenByDescending { it.rssiDbm }
+                        .thenBy { it.ssid.lowercase() },
+                )
+            val signature = observations.fold(17) { accumulator, observation ->
+                31 * accumulator + observation.id.hashCode() +
+                    observation.rssiDbm + observation.timestampMicros.hashCode()
+            }
+            synchronized(stateLock) {
+                if (generation != snapshotGeneration.get() || !receiverRegistered || paused) return@launch
+                val previousSnapshot = mutableState.value.snapshot
+                val reused = lastContentSignature != null && lastContentSignature == signature
+                val likelyThrottled = requestAccepted == false || resultsUpdated == false || reused
+                val snapshot = if (reused && previousSnapshot != null) {
+                    refreshReusedSnapshot(
+                        previous = previousSnapshot,
+                        observations = observations,
+                        connection = connection,
+                        requestAccepted = requestAccepted,
+                        resultsUpdated = resultsUpdated,
+                        likelyThrottled = likelyThrottled,
+                    )
+                } else {
+                    val nowElapsed = SystemClock.elapsedRealtime()
+                    ScanSnapshot(
+                        sequenceId = sequence.incrementAndGet(),
+                        capturedAtEpochMs = System.currentTimeMillis(),
+                        capturedAtElapsedMs = nowElapsed,
+                        sourceTimestampMicros = observations.maxOfOrNull { it.timestampMicros }?.takeIf { it > 0L },
+                        requestAccepted = requestAccepted,
+                        resultsUpdated = resultsUpdated,
+                        likelyThrottled = likelyThrottled,
+                        observations = observations,
+                        connection = connection,
+                    )
+                }
+                lastContentSignature = signature
+                mutableState.value = ScannerState(
+                    phase = ScannerPhase.LIVE,
+                    capabilities = platformCapabilities(),
+                    snapshot = snapshot,
+                    safeErrorCode = null,
+                )
+            }
+        }
+        synchronized(stateLock) {
+            if (generation == snapshotGeneration.get() && receiverRegistered && !paused) {
+                snapshotJob = job
+            } else {
+                job.cancel()
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION")
+    private fun readConnectionEvidence(): ConnectionEvidence {
+        val manager = connectivityManager
+        val legacyWifiInfo = wifiManager?.connectionInfo
+        val reportedPrimaryBssid = normalizeWifiBssid(legacyWifiInfo?.bssid)
+        val activeNetwork = manager.activeNetwork
+        val activeCapabilities = activeNetwork?.let(manager::getNetworkCapabilities)
+        val activeIsPhysicalWifi = activeCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true &&
+            activeCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == false
+        val wifiNetwork = if (activeIsPhysicalWifi) {
+            activeNetwork
+        } else {
+            val candidates = manager.allNetworks.mapNotNull { network ->
+                val capabilities = manager.getNetworkCapabilities(network)
+                if (
+                    capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true &&
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == false
+                ) {
+                    WifiNetworkCandidate(network, capabilities)
+                } else {
+                    null
+                }
+            }
+            val candidateBssids = candidates.map { candidate ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    normalizeWifiBssid((candidate.capabilities.transportInfo as? WifiInfo)?.bssid)
+                } else {
+                    null
+                }
+            }
+            choosePhysicalWifiCandidateIndex(candidateBssids, reportedPrimaryBssid)
+                ?.let { candidates[it].network }
+        }
+        val networkCapabilities = wifiNetwork?.let(manager::getNetworkCapabilities)
+        val linkProperties = wifiNetwork?.let(manager::getLinkProperties)
+        val isWifi = wifiNetwork != null &&
+            networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true &&
+            networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == false
+        val wifiInfo = if (!isWifi) {
+            null
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (networkCapabilities.transportInfo as? WifiInfo) ?: legacyWifiInfo
+        } else {
+            legacyWifiInfo
+        }
+        val bssid = normalizeWifiBssid(wifiInfo?.bssid)
+        val ssid = wifiInfo?.ssid
+            ?.removeSurrounding("\"")
+            ?.takeUnless { it == WifiManager.UNKNOWN_SSID }
+        val defaultGateway = linkProperties?.routes
+            ?.firstOrNull { it.isDefaultRoute }
+            ?.gateway
+            ?.hostAddress
+        val ipAddress = linkProperties?.linkAddresses
+            ?.firstOrNull { it.address.address.size == 4 }
+            ?.address
+            ?.hostAddress
+
+        return ConnectionEvidence(
+            connected = isWifi,
+            bssid = bssid,
+            ssid = ssid,
+            validated = networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
+            captivePortal = networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL),
+            linkSpeedMbps = wifiInfo?.linkSpeed?.takeIf { it >= 0 },
+            rxLinkSpeedMbps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                wifiInfo?.rxLinkSpeedMbps?.takeIf { it >= 0 }
+            } else {
+                null
+            },
+            txLinkSpeedMbps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                wifiInfo?.txLinkSpeedMbps?.takeIf { it >= 0 }
+            } else {
+                null
+            },
+            ipAddress = ipAddress,
+            gateway = defaultGateway,
+            dnsServers = linkProperties?.dnsServers.orEmpty().mapNotNull { it.hostAddress },
+        )
+    }
+
+    private fun publishUnavailable(phase: ScannerPhase) {
+        runWhenScannerActive(
+            lock = stateLock,
+            isActive = { receiverRegistered && !paused },
+        ) {
+            cancelSnapshotWorkLocked()
+            mutableState.value = mutableState.value.copy(
+                phase = phase,
+                capabilities = platformCapabilities(),
+                safeErrorCode = null,
+            )
+        }
+    }
+
+    private data class WifiNetworkCandidate(
+        val network: Network,
+        val capabilities: NetworkCapabilities,
+    )
+
+    private fun cancelSnapshotWorkLocked() {
+        snapshotGeneration.incrementAndGet()
+        snapshotJob?.cancel()
+        snapshotJob = null
+    }
+
+    @Suppress("DEPRECATION")
+    private fun ScanResult.toObservation(connectedBssid: String?): AccessPointObservation {
+        val normalizedBssid = BSSID.orEmpty().lowercase()
+        val securityTypes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            mapStructuredSecurity(securityTypes)
+        } else {
+            emptySet()
+        }
+        return AccessPointObservation(
+            id = normalizedBssid.ifBlank { "unknown-${frequency}-${timestamp}" },
+            ssid = SSID.takeUnless { it.isNullOrBlank() } ?: "Hidden network",
+            bssid = normalizedBssid.ifBlank { "Unavailable" },
+            channel = WifiChannelMapper.fromFrequency(frequency),
+            channelWidthMhz = mapPlatformChannelWidth(channelWidth),
+            footprintCenterFrequencyMhz = centerFreq0.takeIf { it > 0 } ?: frequency,
+            rssiDbm = level,
+            security = securityTypes.ifEmpty { SecurityParser.fromCapabilities(capabilities) },
+            generation = mapWifiGeneration(),
+            timestampMicros = timestamp,
+            isConnected = connectedBssid?.equals(BSSID, ignoreCase = true) == true,
+        )
+    }
+
+    private fun mapStructuredSecurity(values: IntArray): Set<SecurityType> = values.mapTo(linkedSetOf()) {
+        when (it) {
+            WifiInfo.SECURITY_TYPE_OPEN -> SecurityType.OPEN
+            WifiInfo.SECURITY_TYPE_OWE -> SecurityType.OWE
+            WifiInfo.SECURITY_TYPE_WEP -> SecurityType.WEP
+            WifiInfo.SECURITY_TYPE_PSK -> SecurityType.WPA2_PERSONAL
+            WifiInfo.SECURITY_TYPE_SAE -> SecurityType.WPA3_PERSONAL
+            WifiInfo.SECURITY_TYPE_EAP -> SecurityType.ENTERPRISE
+            WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE,
+            WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE_192_BIT -> SecurityType.WPA3_ENTERPRISE
+            WifiInfo.SECURITY_TYPE_WAPI_PSK,
+            WifiInfo.SECURITY_TYPE_WAPI_CERT -> SecurityType.WAPI
+            else -> SecurityType.UNKNOWN
+        }
+    }
+
+    private fun ScanResult.mapWifiGeneration(): WifiGeneration {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return WifiGeneration.UNKNOWN
+        return when (wifiStandard) {
+            ScanResult.WIFI_STANDARD_LEGACY -> WifiGeneration.LEGACY
+            ScanResult.WIFI_STANDARD_11N -> WifiGeneration.WIFI_4
+            ScanResult.WIFI_STANDARD_11AC -> WifiGeneration.WIFI_5
+            ScanResult.WIFI_STANDARD_11AX ->
+                if (frequency >= 5925) WifiGeneration.WIFI_6E else WifiGeneration.WIFI_6
+            ScanResult.WIFI_STANDARD_11BE -> WifiGeneration.WIFI_7
+            else -> WifiGeneration.UNKNOWN
+        }
+    }
+
+}
+
+internal fun mapPlatformChannelWidth(value: Int): Int? = when (value) {
+    ScanResult.CHANNEL_WIDTH_20MHZ -> 20
+    ScanResult.CHANNEL_WIDTH_40MHZ -> 40
+    ScanResult.CHANNEL_WIDTH_80MHZ -> 80
+    ScanResult.CHANNEL_WIDTH_160MHZ -> 160
+    ScanResult.CHANNEL_WIDTH_80MHZ_PLUS_MHZ -> null
+    ScanResult.CHANNEL_WIDTH_320MHZ -> 320
+    else -> null
+}
+
+internal fun <T> runWhenScannerActive(
+    lock: Any,
+    isActive: () -> Boolean,
+    action: () -> T,
+): T? = synchronized(lock) {
+    if (isActive()) action() else null
+}
+
+internal fun refreshReusedSnapshot(
+    previous: ScanSnapshot,
+    observations: List<AccessPointObservation>,
+    connection: ConnectionEvidence,
+    requestAccepted: Boolean?,
+    resultsUpdated: Boolean?,
+    likelyThrottled: Boolean,
+): ScanSnapshot = previous.copy(
+    requestAccepted = requestAccepted ?: previous.requestAccepted,
+    resultsUpdated = resultsUpdated ?: previous.resultsUpdated,
+    likelyThrottled = previous.likelyThrottled || likelyThrottled,
+    observations = observations,
+    connection = connection,
+)
+
+internal fun choosePhysicalWifiCandidateIndex(
+    candidateBssids: List<String?>,
+    reportedPrimaryBssid: String?,
+): Int? {
+    val normalizedPrimary = normalizeWifiBssid(reportedPrimaryBssid)
+    val matching = if (normalizedPrimary == null) {
+        emptyList()
+    } else {
+        candidateBssids.mapIndexedNotNull { index, bssid ->
+            index.takeIf { normalizeWifiBssid(bssid) == normalizedPrimary }
+        }
+    }
+    return when {
+        matching.size == 1 -> matching.single()
+        candidateBssids.size == 1 -> 0
+        else -> null
+    }
+}
+
+internal fun normalizeWifiBssid(value: String?): String? = value
+    ?.lowercase()
+    ?.takeUnless { it == "02:00:00:00:00:00" || it.isBlank() }

@@ -1,0 +1,45 @@
+# Local device captures may contain nearby SSIDs, BSSIDs, or device metadata.
+research/private-captures/
+
+# Android and Gradle outputs
+.gradle/
+build/
+**/build/
+hs_err_pid*.log
+replay_pid*.log
+local.properties
+*.apk
+*.aab
+
+# Private Android release-signing material and local signing configuration
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pkcs12
+*.pem
+*.der
+*.key
+*.asc
+*.gpg
+keystore.properties
+signing.properties
+secrets.properties
+.env
+.env.*
+!.env.example
+
+# Local maintainer signing workflow and custody notes
+docs/release/signing.md
+docs/**/*signing*.md
+docs/release/private/
+scripts/build-signed-release-macos.sh
+scripts/**/*signing*
+scripts/**/*signed-release*
+scripts/release/private/
+
+# IDE and OS files
+.idea/
+*.iml
+.DS_Store
+.kotlin/

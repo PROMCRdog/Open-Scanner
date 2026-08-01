@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a maintainable, privacy-preserving improvement.
+title: "feature: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem should the project solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful outcome, not only an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy, permissions, and safety impact
+      description: Explain new data, permissions, network access, storage, or active behavior. Write None when there is no impact.
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Product boundary
+      options:
+        - label: The proposal is compatible with the passive, local-first product boundary or clearly explains why an ADR is needed.
+          required: true
