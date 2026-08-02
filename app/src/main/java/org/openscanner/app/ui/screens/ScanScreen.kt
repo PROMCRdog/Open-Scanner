@@ -35,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -50,16 +49,18 @@ import org.openscanner.app.OpenScannerUiState
 import org.openscanner.app.R
 import org.openscanner.app.ui.components.AppHeader
 import org.openscanner.app.ui.components.ChannelGroupSelector
+import org.openscanner.app.ui.components.CurrentWifiBadge
 import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.SignalGlyph
 import org.openscanner.app.ui.displayLabel
 import org.openscanner.app.ui.displayName
 import org.openscanner.app.ui.theme.ScannerBorder
 import org.openscanner.app.ui.theme.ScannerCyan
+import org.openscanner.app.ui.theme.ScannerGreen
 import org.openscanner.app.ui.theme.ScannerIconWell
 import org.openscanner.app.ui.theme.ScannerMuted
-import org.openscanner.app.ui.theme.ScannerOnCyan
 import org.openscanner.app.ui.theme.ScannerSpacing
+import org.openscanner.app.ui.theme.ScannerPositiveSurface
 import org.openscanner.app.ui.theme.ScannerSurface
 import org.openscanner.app.ui.theme.ScannerText
 import org.openscanner.core.model.WifiChannelGroup
@@ -217,18 +218,17 @@ private fun ToolbarButton(icon: ImageVector, description: String, onClick: () ->
 private fun StateBadge(
     text: String,
     modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
 ) {
     val shape = MaterialTheme.shapes.extraSmall
     Box(
         modifier = modifier
-            .background(if (emphasized) ScannerCyan else Color.Transparent, shape)
+            .background(ScannerSurface, shape)
             .border(1.dp, ScannerCyan, shape)
             .padding(horizontal = ScannerSpacing.Sm, vertical = ScannerSpacing.Xs),
     ) {
         Text(
             text,
-            color = if (emphasized) ScannerOnCyan else ScannerCyan,
+            color = ScannerCyan,
             style = MaterialTheme.typography.labelMedium,
         )
     }
@@ -241,8 +241,8 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
     val securityLabel = network.securityTypes.displayLabel()
     val connectionHighlight = if (network.connected) {
         Modifier
-            .background(ScannerIconWell, rowShape)
-            .border(1.dp, ScannerCyan, rowShape)
+            .background(ScannerPositiveSurface, rowShape)
+            .border(1.dp, ScannerGreen, rowShape)
     } else {
         Modifier
     }
@@ -281,7 +281,7 @@ private fun NetworkRow(network: NetworkUiModel, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(ScannerSpacing.Sm),
                 ) {
                     if (network.connected) {
-                        StateBadge(stringResource(R.string.scan_badge_current_wifi), emphasized = true)
+                        CurrentWifiBadge()
                     }
                     Text(
                         buildString {

@@ -54,6 +54,7 @@ import org.openscanner.app.NetworkUiModel
 import org.openscanner.app.OpenScannerUiState
 import org.openscanner.app.R
 import org.openscanner.app.ui.components.AppHeader
+import org.openscanner.app.ui.components.CurrentWifiBadge
 import org.openscanner.app.ui.components.InformationBanner
 import org.openscanner.app.ui.components.PrimaryAction
 import org.openscanner.app.ui.components.SignalGlyph
@@ -218,6 +219,9 @@ fun TrackScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                                if (candidate.connected) {
+                                    CurrentWifiBadge(modifier = Modifier.padding(top = ScannerSpacing.Xs))
+                                }
                                 Text(
                                     stringResource(
                                         R.string.track_row_channel,
@@ -226,6 +230,7 @@ fun TrackScreen(
                                     ),
                                     color = ScannerMuted,
                                     style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(top = ScannerSpacing.Xs),
                                 )
                             }
                             Text(
@@ -284,6 +289,7 @@ private fun SelectedNetworkCard(network: NetworkUiModel, onClick: () -> Unit) {
         SignalGlyph(network.signalDbm)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
             Text(displayName, color = ScannerText, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (network.connected) CurrentWifiBadge()
             Text(
                 stringResource(
                     R.string.track_selected_network_details,

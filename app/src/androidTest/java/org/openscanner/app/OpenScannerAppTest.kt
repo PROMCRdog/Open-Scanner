@@ -4,7 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -101,6 +104,133 @@ class OpenScannerAppTest {
             "Sample network, -52 dBm, 5.2 GHz, channel 36, WPA3 Personal, " +
                 "current system Wi-Fi connection, selected for tracking",
         ).assertIsDisplayed()
+    }
+
+    @Test
+    fun spectrumSelectorShowsAllNetworksAndCanFocusTheChart() {
+        val base = liveState()
+        var focusedId by mutableStateOf("spectrum-1")
+        val networks = (1..6).map { index ->
+            base.networks.single().copy(
+                uiId = "spectrum-$index",
+                name = "Spectrum network $index",
+                signalDbm = -40 - index,
+                connected = index == 3,
+                selected = false,
+            )
+        }
+        composeRule.setContent {
+            val currentNetworks = networks.map { it.copy(selected = it.uiId == focusedId) }
+            OpenScannerTheme {
+                OpenScannerApp(
+                    state = base.copy(
+                        activeTab = AppTab.SPECTRUM,
+                        networks = currentNetworks,
+                        selectedNetwork = currentNetworks.first { it.selected },
+                    ),
+                    onTabSelected = {},
+                    onChannelGroupSelected = {},
+                    onSelectNetwork = { networkId, _ -> focusedId = networkId },
+                    onRefresh = {},
+                    onPauseChanged = {},
+                    onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
+                    onRefreshIntervalChanged = {},
+                    onResetSettings = {},
+                    onRequestPermission = {},
+                    onOpenWifiSettings = {},
+                    onOpenLocationSettings = {},
+                    onLogFieldChanged = { _, _ -> },
+                    onSetAllLogFields = {},
+                    onStartLogging = {},
+                    onStopLogging = {},
+                    onClearLog = {},
+                    buildSnapshotExport = { null },
+                    buildLogExport = { null },
+                    shareExport = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Showing 6 of 6 in this channel group").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Spectrum network 6", substring = true).assertIsDisplayed()
+
+        composeRule.onNodeWithText("Choose").performClick()
+        composeRule.onNodeWithText("Choose displayed networks").assertIsDisplayed()
+        composeRule.onNodeWithText("Spectrum network 6").assertIsDisplayed()
+        composeRule.onNodeWithText("CURRENT WI-FI").assertIsDisplayed()
+        composeRule.onNodeWithText("FOCUS · ONE").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Spectrum network 1 is focused").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Focus Spectrum network 1").assertIsSelected()
+        composeRule.onNodeWithContentDescription("Focus Spectrum network 2")
+            .assertIsEnabled()
+            .assertIsNotSelected()
+            .performClick()
+        composeRule.onNodeWithContentDescription("Focus Spectrum network 1").assertIsNotSelected()
+        composeRule.onNodeWithContentDescription("Focus Spectrum network 2").assertIsSelected()
+        composeRule.onNodeWithContentDescription("Spectrum network 2 is focused").assertIsDisplayed()
+        composeRule.onNodeWithText("Only focused").performClick()
+        composeRule.onNodeWithText("Done").performClick()
+
+        composeRule.onNodeWithText("Showing 1 of 6 in this channel group").assertIsDisplayed()
+
+        composeRule.onNodeWithText("Choose").performClick()
+        composeRule.onNodeWithText("Show all").performClick()
+        composeRule.onNodeWithText("Done").performClick()
+        composeRule.onNodeWithText("Showing 6 of 6 in this channel group").assertIsDisplayed()
+        composeRule.onNodeWithText("Spectrum network 3 · CURRENT WI-FI").assertIsDisplayed()
+    }
+
+    @Test
+    fun trackSelectorCarriesTheCurrentWifiTag() {
+        val base = liveState()
+        val focused = base.networks.single().copy(
+            uiId = "focused",
+            name = "Focused network",
+            connected = false,
+            selected = true,
+        )
+        val connected = focused.copy(
+            uiId = "connected",
+            name = "Connected network",
+            connected = true,
+            selected = false,
+        )
+        composeRule.setContent {
+            OpenScannerTheme {
+                OpenScannerApp(
+                    state = base.copy(
+                        activeTab = AppTab.TRACK,
+                        networks = listOf(focused, connected),
+                        selectedNetwork = focused,
+                    ),
+                    onTabSelected = {},
+                    onChannelGroupSelected = {},
+                    onSelectNetwork = { _, _ -> },
+                    onRefresh = {},
+                    onPauseChanged = {},
+                    onPrivacyChanged = {},
+                    onRedactExportsChanged = {},
+                    onRefreshIntervalChanged = {},
+                    onResetSettings = {},
+                    onRequestPermission = {},
+                    onOpenWifiSettings = {},
+                    onOpenLocationSettings = {},
+                    onLogFieldChanged = { _, _ -> },
+                    onSetAllLogFields = {},
+                    onStartLogging = {},
+                    onStopLogging = {},
+                    onClearLog = {},
+                    buildSnapshotExport = { null },
+                    buildLogExport = { null },
+                    shareExport = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Choose network").performScrollTo().performClick()
+        composeRule.onNodeWithText("CURRENT WI-FI").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Connected network").assertIsDisplayed()
     }
 
     @Test
@@ -370,11 +500,11 @@ class OpenScannerAppTest {
     fun settingsAboutUsesBuildVersion() {
         showSettings(state = liveState())
 
-        composeRule.onNodeWithText("Version 0.2.0 · Apache License 2.0 · open source")
+        composeRule.onNodeWithText("Version 0.2.1 · Apache License 2.0 · open source")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithText("About Open Scanner").performScrollTo().performClick()
-        composeRule.onNodeWithText("Open Scanner 0.2.0").assertIsDisplayed()
+        composeRule.onNodeWithText("Open Scanner 0.2.1").assertIsDisplayed()
     }
 
     @Test

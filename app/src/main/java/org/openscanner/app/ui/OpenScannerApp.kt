@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -111,6 +112,7 @@ fun OpenScannerApp(
     onLanguageSelected: (AppLanguage) -> Unit = {},
 ) {
     var exportPreview by remember { mutableStateOf<ExportPreview?>(null) }
+    val spectrumSelections = remember { mutableStateMapOf<WifiChannelGroup, Set<String>>() }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = ScannerBackground,
@@ -172,7 +174,19 @@ fun OpenScannerApp(
                     )
                 }
                 AppTab.SPECTRUM -> if (dataAvailable) {
-                    SpectrumScreen(state = state, onChannelGroupSelected = onChannelGroupSelected)
+                    SpectrumScreen(
+                        state = state,
+                        customSelectionIds = spectrumSelections[state.selectedChannelGroup],
+                        onChannelGroupSelected = onChannelGroupSelected,
+                        onCustomSelectionChanged = { selection ->
+                            if (selection == null) {
+                                spectrumSelections.remove(state.selectedChannelGroup)
+                            } else {
+                                spectrumSelections[state.selectedChannelGroup] = selection
+                            }
+                        },
+                        onFocusedNetworkSelected = { onSelectNetwork(it, false) },
+                    )
                 } else {
                     ScannerUnavailable(
                         phase = state.phase,

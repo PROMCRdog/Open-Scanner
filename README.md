@@ -6,7 +6,7 @@ English | [简体中文](README.zh-CN.md)
 
 Open Scanner is a local-first, open-source Wi-Fi analysis toolkit for Android. It turns Android's passive scan results into a clear five-tab workflow: **Scan**, **Track**, **Spectrum**, **Tools**, and **Settings**.
 
-Version 0.1.0 is an early public release: its automated privacy/build gates, permanent signature, exact-artifact verification, and bounded physical-device smoke test passed. It is not yet broad API 26–36 device or manual accessibility/performance certification. The v0.2.0 development line adds a truthful conditional five-second request mode; its implementation and device validation must pass the separate [v0.2.0 checklist](docs/release/v0.2.0-checklist.md) before release. Assurance policy remains defined by [ADR 0003](docs/adr/0003-early-public-release-policy.md).
+Version 0.2.0 is the current published early release. Its conditional five-second request mode, language selector, permanent signature, exact-artifact verification, and bounded API 36 device checks passed the [v0.2.0 checklist](docs/release/v0.2.0-checklist.md). The v0.2.1 development line removes the Spectrum chart's four-network cap, adds user-controlled curve and single-choice focus selection, and distinguishes the current Wi-Fi across network selectors; it remains a candidate until the separate [v0.2.1 checklist](docs/release/v0.2.1-checklist.md) is complete. Assurance policy remains defined by [ADR 0003](docs/adr/0003-early-public-release-policy.md).
 
 The interface follows the selected dark **Field Console** direction. It prioritizes legibility, labelled controls, explicit freshness, and honest unavailable states over maximum data density. The channel spectrum from the alternate design is preserved as a dedicated top-level tab.
 
@@ -21,7 +21,7 @@ The interface follows the selected dark **Field Console** direction. It prioriti
 - Requested intervals of 5, 10, 15, 30, and 60 seconds. **5 s request mode** is foreground-only and available only when Android explicitly reports scan throttling off; it shows actual source age and never turns cached data into a new sample.
 - A selected-AP tracker with a timestamp-scaled, bounded 60-sample, memory-only signal history and a visible gap when the latest evidence is no longer current.
 - A recent-snapshot stability indicator that reports RSSI range and observed absence share instead of requiring users to infer flapping from the graph.
-- A dedicated Canvas spectrum graph showing up to four emphasized networks and an accessible text equivalent; unknown channel widths stay visibly unknown instead of becoming invented 20 MHz footprints.
+- A dedicated Canvas channel-footprint graph that shows every AP in the selected channel group by default, with a multi-select display filter, a single-choice focus control, independent cyan focus and green Current Wi-Fi roles, primary-channel marking for bonded footprints, and an accessible text equivalent. Unknown channel widths stay visibly unknown instead of becoming invented 20 MHz footprints.
 - Observed co-channel/overlap analysis that does not pretend to know legal router channels or airtime utilization.
 - Android-provided physical Wi-Fi connection validation, captive-portal, link-speed, IP, gateway, and DNS evidence without mixing in a cellular default route or probing an external server.
 - A passive neighborhood posture summary with observed counts by channel group, advertised security profile, and reported Wi-Fi generation.

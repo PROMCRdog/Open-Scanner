@@ -27,6 +27,17 @@ class SpectrumGeometryTest {
     }
 
     @Test
+    fun channel149WideFootprintKeepsPrimaryAndBondedCenterDistinct() {
+        val network = network(widthMhz = 80, primaryMhz = 5_745, centerMhz = 5_775)
+        val footprint = network.spectrumFootprint()
+
+        assertEquals(149, org.openscanner.core.domain.WifiChannelMapper.fromFrequency(network.frequencyMhz).number)
+        assertEquals(5_745, network.frequencyMhz)
+        assertEquals(5_775, footprint.centerFrequencyMhz)
+        assertEquals(80, footprint.widthMhz)
+    }
+
+    @Test
     fun knownWidthsRemainFrequencyScaledWithoutVisualInflation() {
         val axisStart = 5_150f
         val axisEnd = 5_900f

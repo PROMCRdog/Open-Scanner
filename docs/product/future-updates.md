@@ -52,6 +52,12 @@ All are **Stock** — pure transformations of data the app already holds, with n
 
 The stability indicator uses explicit coarse thresholds: after at least four assessed snapshots and three present observations, an absence share of 25% or more is Flapping; otherwise any absence share above 10% or RSSI range above 10 dB is Variable; the remainder is Steady. The UI always shows the underlying present/assessed counts, absence share, and RSSI range and states that this is scan consistency rather than connection quality.
 
+## 2.1 Spectrum display scaling
+
+**Status: implemented for the v0.2.1 candidate.** Spectrum no longer truncates a selected channel group to four curves. Every observed AP in the group is displayed by default. A per-group, in-memory multi-select filter lets the user show or hide individual curves, restore all curves, or keep only the focused AP. A separate radio control in the same selector chooses exactly one focused AP; changing focus never changes Android's Wi-Fi connection. The selector makes that single-choice rule explicit with a `FOCUS · ONE` heading, a cyan-highlighted focused row and badge, and muted but still selectable alternative radio controls. The focused AP remains pinned so the chart, summary, and overlap analysis do not silently refer to different networks.
+
+The chart uses scalable visual roles rather than assigning an unlimited set of unrelated colors: cyan identifies focus, green identifies Android's current Wi-Fi connection, and the remaining displayed APs share a subdued purple role. If focus and connection refer to the same AP, a green peak marker preserves the independent connection status. The exact `CURRENT WI-FI` badge is also carried into the Spectrum selector and Track picker. For bonded widths, the footprint remains centered on Android's reported segment center while a dashed marker and text identify the primary channel. Curve visibility does not change the full-snapshot overlap analysis, and the selector says so explicitly.
+
 ## 3. Wi-Fi session logging
 
 **Status: implemented as a bounded, memory-only session workflow.** Tools provides field selection, explicit start/stop, session statistics, clear/replace confirmation, and text/JSON/CSV export with an exact redacted-by-default preview.
