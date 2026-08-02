@@ -26,6 +26,7 @@ The interface follows the selected dark **Field Console** direction. It prioriti
 - Android-provided physical Wi-Fi connection validation, captive-portal, link-speed, IP, gateway, and DNS evidence without mixing in a cellular default route or probing an external server.
 - A passive neighborhood posture summary with observed counts by channel group, advertised security profile, and reported Wi-Fi generation.
 - Global on-screen Privacy Mode persisted through DataStore.
+- An in-app language selector for System default, English, and Simplified Chinese; System default follows future device-language changes and remains the clean-install/reset choice.
 - Explicit start/stop Wi-Fi session logging with selectable fields and a report-redaction choice frozen when each session starts.
 - Redacted-by-default snapshot and text/JSON/CSV log export, with an explicit warning before enabling raw reports and an exact confirmation preview before every share.
 - Temporary exports use Android's URI-grant flow and are deleted after one hour while the app remains open or on a later app start/export.

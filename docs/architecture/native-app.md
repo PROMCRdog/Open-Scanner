@@ -33,6 +33,8 @@ Wi-Fi session logging is explicit and memory-only. The selected field set and re
 
 Snapshot and log exports are complete `ExportDocument` values carrying an explicit redaction flag and previewed before sharing. Unredacted documents use conspicuous titles/filenames, a sensitive-data warning, and a dedicated **Share unredacted** confirmation. `MainActivity` writes only the approved payload to `cacheDir/exports`, shares it through a non-exported `FileProvider` and temporary read grant, and deletes it after one hour while the process remains alive or during a later app start/export. No storage permission is used.
 
+App language is platform-managed rather than duplicated in DataStore. Settings passes System default, English, or Simplified Chinese to `AppCompatDelegate`; the empty locale list means System default. `AppCompatActivity` provides the API 26–32 compatibility path, while Android 13+ synchronizes the same selection with the system App language setting. AGP generates a locale configuration containing exactly `en` and `zh-CN`. AppCompat's locale metadata holder is disabled and non-exported, and its unused EmojiCompat startup initializer is removed so the selector does not add font-provider queries or background emoji initialization.
+
 ## Dependency direction
 
 - `app` depends on every lower module and Android framework UI APIs.
@@ -52,4 +54,6 @@ The Compose UI is built on the tokenized design system documented in [ui-design-
 - Compose `LazyColumn` for the access-point inventory.
 - Canvas charts capped at 60 timeline samples and four emphasized spectrum series.
 - DataStore writes only explicit preference changes; session logs never enter DataStore.
+- Per-app locale storage is delegated to Android/AppCompat; the app keeps no second locale preference or polling loop.
+- The unused EmojiCompat initializer is removed, avoiding its deferred font-loader thread and metadata allocation.
 - No background scan service; the coordinator stops when the visible activity stops.
