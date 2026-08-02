@@ -221,6 +221,16 @@
     <string name="settings_redact_reports_label">报告脱敏</string>
     <string name="settings_redact_reports_detail_on">在快照和新日志中遮蔽标识符、本地地址和精确时间戳</string>
     <string name="settings_redact_reports_detail_off">未脱敏的报告可能泄露您的位置和本地网络；每次导出都会先预览</string>
+    <string name="settings_section_display">显示</string>
+    <string name="settings_language_label">应用语言</string>
+    <string name="settings_language_system_default_summary">系统默认 · 跟随设备语言</string>
+    <string name="settings_language_dialog_title">选择应用语言</string>
+    <string name="settings_language_system_default">系统默认</string>
+    <string name="settings_language_system_default_detail">跟随设备语言及其后续更改</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_english_detail">始终使用英文</string>
+    <string name="settings_language_simplified_chinese">简体中文</string>
+    <string name="settings_language_simplified_chinese_detail">始终使用简体中文</string>
     <string name="settings_section_scanning">扫描</string>
     <string name="settings_android_wifi_label">Android Wi-Fi 设置</string>
     <string name="settings_android_wifi_detail">加入网络和密码操作保留在系统界面中</string>
@@ -255,9 +265,9 @@
     <string name="settings_allow_unredacted">允许未脱敏</string>
     <string name="settings_keep_redaction_on">保持脱敏开启</string>
     <string name="settings_reset_label">重置设置</string>
-    <string name="settings_reset_detail">将隐私、报告脱敏和刷新偏好恢复为默认值</string>
+    <string name="settings_reset_detail">将语言、隐私、报告脱敏和刷新偏好恢复为默认值</string>
     <string name="settings_reset_dialog_title">重置设置？</string>
-    <string name="settings_reset_dialog_text">这将恢复默认的显示隐私、报告脱敏和刷新偏好。扫描历史和 Wi-Fi 日志会话本就只保存在内存中。</string>
+    <string name="settings_reset_dialog_text">这将恢复系统默认语言、显示隐私、报告脱敏和刷新偏好。扫描历史和 Wi-Fi 日志会话本就只保存在内存中。</string>
     <string name="settings_reset">重置</string>
     <string name="settings_cancel">取消</string>
 

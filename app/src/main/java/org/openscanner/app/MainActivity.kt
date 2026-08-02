@@ -8,11 +8,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
@@ -26,7 +26,7 @@ import org.openscanner.app.ui.OpenScannerApp
 import org.openscanner.app.ui.theme.OpenScannerTheme
 import org.openscanner.core.export.ExportDocument
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val graph: AppGraph get() = (application as OpenScannerApplication).graph
     private val viewModel: OpenScannerViewModel by viewModels {
         OpenScannerViewModel.Factory(graph.wifiScanRepository, graph.settingsRepository)
@@ -62,7 +62,12 @@ class MainActivity : ComponentActivity() {
                     onPrivacyChanged = viewModel::setPrivacyMode,
                     onRedactExportsChanged = viewModel::setRedactExports,
                     onRefreshIntervalChanged = viewModel::setRefreshIntervalSeconds,
-                    onResetSettings = viewModel::resetSettings,
+                    selectedLanguage = AppLocaleController.currentLanguage(),
+                    onLanguageSelected = AppLocaleController::setLanguage,
+                    onResetSettings = {
+                        viewModel.resetSettings()
+                        AppLocaleController.setLanguage(AppLanguage.SYSTEM_DEFAULT)
+                    },
                     onRequestPermission = ::requestLocationPermission,
                     onOpenWifiSettings = { openSystemSettings(Settings.ACTION_WIFI_SETTINGS) },
                     onOpenLocationSettings = { openSystemSettings(Settings.ACTION_LOCATION_SOURCE_SETTINGS) },

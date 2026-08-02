@@ -222,6 +222,16 @@
     <string name="settings_redact_reports_label">Redact reports</string>
     <string name="settings_redact_reports_detail_on">Mask identifiers, local addresses, and precise timestamps in snapshots and new logs</string>
     <string name="settings_redact_reports_detail_off">Unredacted reports may reveal your location and local network; every export is previewed</string>
+    <string name="settings_section_display">Display</string>
+    <string name="settings_language_label">App language</string>
+    <string name="settings_language_system_default_summary">System default · follows device language</string>
+    <string name="settings_language_dialog_title">Choose app language</string>
+    <string name="settings_language_system_default">System default</string>
+    <string name="settings_language_system_default_detail">Follow the device language and future changes</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_english_detail">Always use English</string>
+    <string name="settings_language_simplified_chinese">简体中文 (Simplified Chinese)</string>
+    <string name="settings_language_simplified_chinese_detail">Always use Simplified Chinese</string>
     <string name="settings_section_scanning">Scanning</string>
     <string name="settings_android_wifi_label">Android Wi-Fi settings</string>
     <string name="settings_android_wifi_detail">Joining networks and passwords stay in the system UI</string>
@@ -256,9 +266,9 @@
     <string name="settings_allow_unredacted">Allow unredacted</string>
     <string name="settings_keep_redaction_on">Keep redaction on</string>
     <string name="settings_reset_label">Reset settings</string>
-    <string name="settings_reset_detail">Restore privacy, report redaction, and refresh preferences to defaults</string>
+    <string name="settings_reset_detail">Restore language, privacy, report redaction, and refresh preferences to defaults</string>
     <string name="settings_reset_dialog_title">Reset settings?</string>
-    <string name="settings_reset_dialog_text">This restores default display privacy, report redaction, and refresh preferences. Scan history and Wi-Fi log sessions already remain memory-only.</string>
+    <string name="settings_reset_dialog_text">This restores the system-default language, display privacy, report redaction, and refresh preferences. Scan history and Wi-Fi log sessions already remain memory-only.</string>
     <string name="settings_reset">Reset</string>
     <string name="settings_cancel">Cancel</string>
 

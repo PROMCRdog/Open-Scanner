@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -313,8 +314,8 @@ class OpenScannerAppTest {
         )
 
         composeRule.onNodeWithText("5 s").assertIsDisplayed()
-        composeRule.onNodeWithText(reason).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("5 s option disabled. $reason").assertIsNotEnabled()
+        composeRule.onNodeWithText(reason).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("5 s option disabled. $reason").performScrollTo().assertIsNotEnabled()
         assertEquals(null, requestedInterval)
     }
 
@@ -330,8 +331,8 @@ class OpenScannerAppTest {
 
         composeRule.onNodeWithText(
             "5 s request mode is available. It may use more battery; fresh-result cadence still depends on Android and the device.",
-        ).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("5 s").performClick()
+        ).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("5 s").performScrollTo().performClick()
         assertEquals(5, requestedInterval)
     }
 
@@ -344,8 +345,8 @@ class OpenScannerAppTest {
             ),
         )
 
-        composeRule.onNodeWithText(reason).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("5 s option disabled. $reason").assertIsDisplayed()
+        composeRule.onNodeWithText(reason).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("5 s option disabled. $reason").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -360,8 +361,8 @@ class OpenScannerAppTest {
             ),
         )
 
-        composeRule.onNodeWithText(reason).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("5 s option disabled. $reason").assertIsNotEnabled()
+        composeRule.onNodeWithText(reason).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("5 s option disabled. $reason").performScrollTo().assertIsNotEnabled()
         composeRule.onNodeWithText("Checking").assertIsDisplayed()
     }
 
@@ -369,9 +370,30 @@ class OpenScannerAppTest {
     fun settingsAboutUsesBuildVersion() {
         showSettings(state = liveState())
 
-        composeRule.onNodeWithText("Version 0.2.0 · Apache License 2.0 · open source").assertIsDisplayed()
-        composeRule.onNodeWithText("About Open Scanner").performClick()
+        composeRule.onNodeWithText("Version 0.2.0 · Apache License 2.0 · open source")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("About Open Scanner").performScrollTo().performClick()
         composeRule.onNodeWithText("Open Scanner 0.2.0").assertIsDisplayed()
+    }
+
+    @Test
+    fun appLanguageDefaultsToSystemAndOffersEnglishAndSimplifiedChinese() {
+        var requestedLanguage: AppLanguage? = null
+        showSettings(
+            state = liveState(),
+            selectedLanguage = AppLanguage.SYSTEM_DEFAULT,
+            onLanguageSelected = { requestedLanguage = it },
+        )
+
+        composeRule.onNodeWithText("App language").assertIsDisplayed()
+        composeRule.onNodeWithText("System default · follows device language").assertIsDisplayed()
+        composeRule.onNodeWithText("App language").performClick()
+        composeRule.onNodeWithText("Choose app language").assertIsDisplayed()
+        composeRule.onNodeWithText("English").assertIsDisplayed()
+        composeRule.onNodeWithText("简体中文 (Simplified Chinese)").performClick()
+
+        assertEquals(AppLanguage.SIMPLIFIED_CHINESE, requestedLanguage)
     }
 
     @Test
@@ -461,6 +483,8 @@ class OpenScannerAppTest {
     private fun showSettings(
         state: OpenScannerUiState,
         onRefreshIntervalChanged: (Int) -> Unit = {},
+        selectedLanguage: AppLanguage = AppLanguage.SYSTEM_DEFAULT,
+        onLanguageSelected: (AppLanguage) -> Unit = {},
     ) {
         composeRule.setContent {
             OpenScannerTheme {
@@ -486,6 +510,8 @@ class OpenScannerAppTest {
                     buildSnapshotExport = { null },
                     buildLogExport = { null },
                     shareExport = {},
+                    selectedLanguage = selectedLanguage,
+                    onLanguageSelected = onLanguageSelected,
                 )
             }
         }
