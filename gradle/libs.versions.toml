@@ -8,6 +8,7 @@ compose-bom = "2026.06.00"
 coroutines = "1.11.0"
 datastore = "1.2.1"
 lifecycle = "2.10.0"
+startup = "1.1.1"
 junit4 = "4.13.2"
 androidx-test-ext = "1.3.0"
 espresso = "3.7.0"
@@ -20,6 +21,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+androidx-startup-runtime = { module = "androidx.startup:startup-runtime", version.ref = "startup" }
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
 compose-foundation = { module = "androidx.compose.foundation:foundation" }
 compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
