@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.openscanner.app.AppTab
+import org.openscanner.app.AppLanguage
 import org.openscanner.app.OpenScannerUiState
 import org.openscanner.app.R
 import org.openscanner.app.ui.components.InformationBanner
@@ -106,6 +107,8 @@ fun OpenScannerApp(
     buildSnapshotExport: (ExportFormat) -> ExportDocument?,
     buildLogExport: (WifiLogFormat) -> ExportDocument?,
     shareExport: (ExportDocument) -> Unit,
+    selectedLanguage: AppLanguage = AppLanguage.SYSTEM_DEFAULT,
+    onLanguageSelected: (AppLanguage) -> Unit = {},
 ) {
     var exportPreview by remember { mutableStateOf<ExportPreview?>(null) }
     Scaffold(
@@ -199,6 +202,8 @@ fun OpenScannerApp(
                     onPrivacyChanged = onPrivacyChanged,
                     onRedactExportsChanged = onRedactExportsChanged,
                     onRefreshIntervalChanged = onRefreshIntervalChanged,
+                    selectedLanguage = selectedLanguage,
+                    onLanguageSelected = onLanguageSelected,
                     onOpenWifiSettings = onOpenWifiSettings,
                     onResetSettings = onResetSettings,
                 )

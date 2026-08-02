@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Schedule
@@ -34,6 +36,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -57,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.openscanner.app.BuildConfig
+import org.openscanner.app.AppLanguage
 import org.openscanner.app.OpenScannerUiState
 import org.openscanner.app.R
 import org.openscanner.app.ui.components.AppHeader
@@ -78,6 +83,8 @@ fun SettingsScreen(
     onPrivacyChanged: (Boolean) -> Unit,
     onRedactExportsChanged: (Boolean) -> Unit,
     onRefreshIntervalChanged: (Int) -> Unit,
+    selectedLanguage: AppLanguage,
+    onLanguageSelected: (AppLanguage) -> Unit,
     onOpenWifiSettings: () -> Unit,
     onResetSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -85,6 +92,7 @@ fun SettingsScreen(
     var aboutOpen by remember { mutableStateOf(false) }
     var resetOpen by remember { mutableStateOf(false) }
     var allowUnredactedOpen by remember { mutableStateOf(false) }
+    var languageOpen by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()),
@@ -117,6 +125,13 @@ fun SettingsScreen(
             onCheckedChange = { enabled ->
                 if (enabled) onRedactExportsChanged(true) else allowUnredactedOpen = true
             },
+        )
+        SectionLabel(stringResource(R.string.settings_section_display))
+        SettingsRow(
+            icon = Icons.Rounded.Language,
+            label = stringResource(R.string.settings_language_label),
+            detail = languageSummary(selectedLanguage),
+            onClick = { languageOpen = true },
         )
         SectionLabel(stringResource(R.string.settings_section_scanning))
         SettingsRow(
@@ -177,6 +192,32 @@ fun SettingsScreen(
             },
         )
     }
+    if (languageOpen) {
+        SettingsAlertDialog(
+            title = stringResource(R.string.settings_language_dialog_title),
+            onDismiss = { languageOpen = false },
+            icon = { Icon(Icons.Rounded.Language, contentDescription = null) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
+                    AppLanguage.entries.forEach { language ->
+                        LanguageOptionRow(
+                            language = language,
+                            selected = language == selectedLanguage,
+                            onSelect = {
+                                languageOpen = false
+                                onLanguageSelected(language)
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { languageOpen = false }) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
     if (allowUnredactedOpen) {
         SettingsAlertDialog(
             title = stringResource(R.string.settings_unredacted_dialog_title),
@@ -217,6 +258,54 @@ fun SettingsScreen(
             },
             dismissButton = { TextButton(onClick = { resetOpen = false }) { Text(stringResource(R.string.settings_cancel)) } },
         )
+    }
+}
+
+@Composable
+private fun languageSummary(language: AppLanguage): String = when (language) {
+    AppLanguage.SYSTEM_DEFAULT -> stringResource(R.string.settings_language_system_default_summary)
+    AppLanguage.ENGLISH -> stringResource(R.string.settings_language_english)
+    AppLanguage.SIMPLIFIED_CHINESE -> stringResource(R.string.settings_language_simplified_chinese)
+}
+
+@Composable
+private fun LanguageOptionRow(
+    language: AppLanguage,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    val label = when (language) {
+        AppLanguage.SYSTEM_DEFAULT -> stringResource(R.string.settings_language_system_default)
+        AppLanguage.ENGLISH -> stringResource(R.string.settings_language_english)
+        AppLanguage.SIMPLIFIED_CHINESE -> stringResource(R.string.settings_language_simplified_chinese)
+    }
+    val detail = when (language) {
+        AppLanguage.SYSTEM_DEFAULT -> stringResource(R.string.settings_language_system_default_detail)
+        AppLanguage.ENGLISH -> stringResource(R.string.settings_language_english_detail)
+        AppLanguage.SIMPLIFIED_CHINESE -> stringResource(R.string.settings_language_simplified_chinese_detail)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = ScannerSpacing.MinTouchTarget + 12.dp)
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onSelect,
+            )
+            .padding(horizontal = ScannerSpacing.Sm, vertical = ScannerSpacing.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ScannerSpacing.Md),
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+            colors = RadioButtonDefaults.colors(selectedColor = ScannerCyan),
+        )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ScannerSpacing.Xs)) {
+            Text(label, color = ScannerText, style = MaterialTheme.typography.titleMedium)
+            Text(detail, color = ScannerMuted, style = MaterialTheme.typography.labelSmall)
+        }
     }
 }
 

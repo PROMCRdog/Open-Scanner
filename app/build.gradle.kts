@@ -21,6 +21,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    androidResources {
+        generateLocaleConfig = true
+        localeFilters += listOf("en", "zh-rCN")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -65,6 +70,7 @@ dependencies {
     implementation(project(":data:settings"))
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
