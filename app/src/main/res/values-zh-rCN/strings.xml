@@ -112,13 +112,28 @@
     <string name="spectrum_channel_spectrum">信道频谱</string>
     <string name="spectrum_dfs_banner">DFS 仅用于命名此观测到的信道范围。Open Scanner 不判断监管层面的可用性，也不判断路由器能否使用。</string>
     <string name="spectrum_no_observations">此快照中没有 %1$s 的观测数据。</string>
-    <string name="spectrum_selected_access_point">已选择的接入点</string>
+    <string name="spectrum_selected_access_point">焦点接入点</string>
     <string name="spectrum_channel">信道</string>
     <string name="spectrum_signal">信号</string>
     <string name="spectrum_signal_dbm">%1$d dBm</string>
     <string name="spectrum_overlap">重叠</string>
     <string name="spectrum_overlap_analysis">观测到的重叠程度：%1$s。%2$s；%3$d 个同信道网络。这是被动观测证据，不构成监管层面的信道推荐。</string>
     <string name="spectrum_analyze_interference">分析观测到的干扰</string>
+    <string name="spectrum_displayed_networks">图中显示的网络</string>
+    <string name="spectrum_showing_networks">此信道组显示 %1$d / %2$d 个网络</string>
+    <string name="spectrum_choose">选择</string>
+    <string name="spectrum_choose_networks">选择图中显示的网络</string>
+    <string name="spectrum_selector_explanation">复选框控制显示的曲线。请选择且仅选择一个焦点用于图表和分析。焦点接入点会始终显示；当前 Wi-Fi 是独立状态。</string>
+    <string name="spectrum_show_all">全部显示</string>
+    <string name="spectrum_only_selected">仅显示焦点</string>
+    <string name="spectrum_selector_channel_signal">信道 %1$s · %2$d dBm</string>
+    <string name="spectrum_selector_show_column">显示</string>
+    <string name="spectrum_selector_focus_column">焦点 · 单选</string>
+    <string name="spectrum_focused_badge">焦点</string>
+    <string name="spectrum_focused_network_cd">%1$s 是当前焦点</string>
+    <string name="spectrum_display_network_cd">在图中显示 %1$s</string>
+    <string name="spectrum_focus_network_cd">将焦点设为 %1$s</string>
+    <string name="spectrum_done">完成</string>
     <plurals name="spectrum_overlapping_networks">
         <item quantity="other">%1$d 个重叠网络</item>
     </plurals>
@@ -288,12 +303,18 @@
     <string name="chart_width_unknown">频宽未知</string>
     <string name="chart_channel_unknown">未知</string>
     <string name="chart_network_summary">%1$s，信道 %2$s，%3$d dBm，%4$s</string>
-    <string name="chart_overlap_description">%1$s 信道重叠图。信号轴 %2$d 至 %3$d dBm。%4$s</string>
-    <string name="chart_selected_label">已选择</string>
+    <string name="chart_network_summary_more">另有 %1$d 个显示网络列在显示选择器中。</string>
+    <string name="chart_overlap_description">%1$s 信道重叠图，显示 %4$d 个网络。信号轴 %2$d 至 %3$d dBm。%5$s</string>
+    <string name="chart_selected_label">焦点</string>
     <string name="chart_no_selection">未选择</string>
     <string name="chart_signal_label">信号</string>
-    <string name="chart_legend_suffix_selected">" · 已选择"</string>
-    <string name="chart_legend_suffix_width_unknown">" · 频宽未知"</string>
+    <string name="chart_selected_primary_and_center">主信道 %1$s · %2$d MHz 占用范围 · 中心 %3$d MHz</string>
+    <string name="chart_selected_channel_and_width">信道 %1$s · %2$s</string>
+    <string name="chart_legend_selected_network">%1$s · 焦点</string>
+    <string name="chart_legend_primary_channel">焦点 AP 的主信道</string>
+    <string name="chart_legend_connected_network">%1$s · 当前 Wi-Fi</string>
+    <string name="chart_legend_other_networks">其他显示网络（%1$d）</string>
+    <string name="chart_legend_unknown_width_count">频宽未知（%1$d）</string>
 
     <!-- Geometry labels -->
     <string name="geo_now">现在</string>

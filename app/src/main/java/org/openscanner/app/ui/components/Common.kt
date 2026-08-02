@@ -262,6 +262,24 @@ fun SignalGlyph(signalDbm: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
+fun CurrentWifiBadge(modifier: Modifier = Modifier) {
+    val shape = MaterialTheme.shapes.extraSmall
+    Box(
+        modifier = modifier
+            .background(ScannerGreen, shape)
+            .border(1.dp, ScannerGreen, shape)
+            .padding(horizontal = ScannerSpacing.Sm, vertical = ScannerSpacing.Xs),
+    ) {
+        Text(
+            text = stringResource(R.string.scan_badge_current_wifi),
+            color = ScannerSurface,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
 fun InformationBanner(
     icon: ImageVector,
     text: String,

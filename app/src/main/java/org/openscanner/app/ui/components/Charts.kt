@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -288,8 +289,8 @@ fun SpectrumChart(
     val plotted = buildList {
         selected?.let(::add)
         addAll(networks.filterNot { it.uiId == selected?.uiId }.sortedByDescending { it.signalDbm })
-    }.distinctBy { it.uiId }.take(4)
-    val colors = listOf(ScannerCyan, ScannerGreen, ScannerOrange, ScannerPurple)
+    }.distinctBy { it.uiId }
+    val connected = plotted.firstOrNull { it.connected }
     val observedFootprintEdges = networks.flatMap { network ->
         val footprint = network.spectrumFootprint()
         val halfWidth = footprint.widthMhz?.div(2f)
@@ -306,7 +307,8 @@ fun SpectrumChart(
     val channelUnknownLabel = stringResource(R.string.chart_channel_unknown)
     val displayNames = mutableMapOf<String, String>()
     for (network in plotted) displayNames[network.uiId] = network.displayName()
-    val summary = plotted.map { network ->
+    val summarizedNetworks = plotted.take(12)
+    val summary = summarizedNetworks.map { network ->
         val width = network.channelWidthMhz?.takeIf { it > 0 }
             ?.let { stringResource(R.string.chart_megahertz_wide, it) } ?: widthUnknownLabel
         stringResource(
@@ -316,12 +318,20 @@ fun SpectrumChart(
             network.signalDbm,
             width,
         )
-    }.joinToString()
+    }.joinToString().let { listed ->
+        val remaining = plotted.size - summarizedNetworks.size
+        if (remaining > 0) {
+            "$listed ${stringResource(R.string.chart_network_summary_more, remaining)}"
+        } else {
+            listed
+        }
+    }
     val overlapDescription = stringResource(
         R.string.chart_overlap_description,
         channelGroup.displayLabel(),
         yAxis.minDbm,
         yAxis.maxDbm,
+        plotted.size,
         summary,
     )
     Column(
@@ -351,6 +361,38 @@ fun SpectrumChart(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (selected?.connected == true) {
+                    CurrentWifiBadge(modifier = Modifier.padding(top = ScannerSpacing.Xs))
+                }
+                selected?.let { network ->
+                    val footprint = network.spectrumFootprint()
+                    val detail = if (
+                        footprint.widthMhz != null &&
+                        footprint.centerFrequencyMhz != network.frequencyMhz
+                    ) {
+                        stringResource(
+                            R.string.chart_selected_primary_and_center,
+                            network.channel?.toString() ?: channelUnknownLabel,
+                            footprint.widthMhz,
+                            footprint.centerFrequencyMhz,
+                        )
+                    } else {
+                        stringResource(
+                            R.string.chart_selected_channel_and_width,
+                            network.channel?.toString() ?: channelUnknownLabel,
+                            footprint.widthMhz
+                                ?.let { stringResource(R.string.chart_megahertz_wide, it) }
+                                ?: widthUnknownLabel,
+                        )
+                    }
+                    Text(
+                        detail,
+                        color = ScannerMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -410,8 +452,12 @@ fun SpectrumChart(
                     drawText(label, color = ScannerMuted, topLeft = Offset(tx, plotBottom + 5.dp.toPx()))
                 }
 
-                plotted.forEachIndexed { index, network ->
-                    val color = colors[index]
+                plotted.forEach { network ->
+                    val color = when {
+                        network.selected -> ScannerCyan
+                        network.connected -> ScannerGreen
+                        else -> ScannerPurple
+                    }
                     val footprint = network.spectrumFootprint()
                     val normalizedHalfSpan = normalizedSpectrumHalfSpan(footprint.widthMhz, axisStart, axisEnd)
                     val centerX = (plotLeft + plotWidth * ((footprint.centerFrequencyMhz - axisStart) / (axisEnd - axisStart)))
@@ -424,7 +470,7 @@ fun SpectrumChart(
                             color = color,
                             start = Offset(centerX, baseY),
                             end = Offset(centerX, peakY),
-                            strokeWidth = if (network.selected) 2.8.dp.toPx() else 1.7.dp.toPx(),
+                            strokeWidth = if (network.selected) 2.8.dp.toPx() else 1.3.dp.toPx(),
                         )
                         drawCircle(color = color, radius = 3.dp.toPx(), center = Offset(centerX, peakY))
                     } else {
@@ -435,13 +481,39 @@ fun SpectrumChart(
                             quadraticTo(centerX + halfWidth * 0.4f, peakY, (centerX + halfWidth).coerceAtMost(plotRight), baseY)
                             close()
                         }
-                        drawPath(path, color.copy(alpha = if (network.selected) 0.20f else 0.10f))
+                        drawPath(path, color.copy(alpha = if (network.selected) 0.20f else 0.065f))
                         drawPath(
                             path,
                             color,
-                            style = Stroke(width = if (network.selected) 2.8.dp.toPx() else 1.7.dp.toPx()),
+                            style = Stroke(width = if (network.selected) 2.8.dp.toPx() else 1.3.dp.toPx()),
                         )
                         drawCircle(color = color, radius = 2.5.dp.toPx(), center = Offset(centerX, peakY))
+                    }
+                    if (network.selected && network.frequencyMhz != footprint.centerFrequencyMhz) {
+                        val primaryX = (
+                            plotLeft + plotWidth * ((network.frequencyMhz - axisStart) / (axisEnd - axisStart))
+                            ).coerceIn(plotLeft, plotRight)
+                        drawLine(
+                            color = ScannerCyan.copy(alpha = 0.85f),
+                            start = Offset(primaryX, plotTop),
+                            end = Offset(primaryX, plotBottom),
+                            strokeWidth = 1.2.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())),
+                        )
+                    }
+                    if (network.connected) {
+                        drawCircle(
+                            color = ScannerGreen,
+                            radius = 4.5.dp.toPx(),
+                            center = Offset(centerX, peakY),
+                        )
+                        if (network.selected) {
+                            drawCircle(
+                                color = ScannerCyan,
+                                radius = 2.2.dp.toPx(),
+                                center = Offset(centerX, peakY),
+                            )
+                        }
                     }
                 }
             }
@@ -460,26 +532,46 @@ fun SpectrumChart(
                     .padding(horizontal = ScannerSpacing.Md, vertical = ScannerSpacing.Sm),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                plotted.chunked(2).forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ScannerSpacing.Md)) {
-                        row.forEach { network ->
-                            val index = plotted.indexOfFirst { it.uiId == network.uiId }
-                            val unknownWidth = network.channelWidthMhz?.takeIf { it > 0 } == null
-                            val label = buildString {
-                                append(displayNames.getValue(network.uiId))
-                                if (network.selected) append(stringResource(R.string.chart_legend_suffix_selected))
-                                if (unknownWidth) append(stringResource(R.string.chart_legend_suffix_width_unknown))
-                            }
-                            ChartLegendEntry(
-                                swatch = if (unknownWidth) LegendSwatch.UnknownWidth else LegendSwatch.Line,
-                                color = colors[index],
-                                label = label,
-                                emphasized = network.selected,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (row.size == 1) Box(Modifier.weight(1f))
+                selected?.let { focused ->
+                    ChartLegendEntry(
+                        swatch = LegendSwatch.Line,
+                        color = ScannerCyan,
+                        label = stringResource(R.string.chart_legend_selected_network, displayNames.getValue(focused.uiId)),
+                        emphasized = true,
+                    )
+                    if (focused.frequencyMhz != focused.spectrumFootprint().centerFrequencyMhz) {
+                        ChartLegendEntry(
+                            swatch = LegendSwatch.PrimaryMarker,
+                            color = ScannerCyan,
+                            label = stringResource(R.string.chart_legend_primary_channel),
+                        )
                     }
+                }
+                connected?.let { current ->
+                    ChartLegendEntry(
+                        swatch = if (current.selected) LegendSwatch.Dot else LegendSwatch.Line,
+                        color = ScannerGreen,
+                        label = stringResource(
+                            R.string.chart_legend_connected_network,
+                            displayNames.getValue(current.uiId),
+                        ),
+                    )
+                }
+                val otherCount = plotted.count { !it.selected && !it.connected }
+                if (otherCount > 0) {
+                    ChartLegendEntry(
+                        swatch = LegendSwatch.Line,
+                        color = ScannerPurple,
+                        label = stringResource(R.string.chart_legend_other_networks, otherCount),
+                    )
+                }
+                val unknownWidthCount = plotted.count { it.channelWidthMhz?.takeIf { width -> width > 0 } == null }
+                if (unknownWidthCount > 0) {
+                    ChartLegendEntry(
+                        swatch = LegendSwatch.UnknownWidth,
+                        color = ScannerMuted,
+                        label = stringResource(R.string.chart_legend_unknown_width_count, unknownWidthCount),
+                    )
                 }
             }
         }
@@ -492,6 +584,7 @@ private enum class LegendSwatch {
     Dot,
     StaleRegion,
     UnknownWidth,
+    PrimaryMarker,
 }
 
 @Composable
@@ -540,6 +633,16 @@ private fun ChartLegendEntry(
                         strokeWidth = strokeWidth,
                     )
                     drawCircle(color = color, radius = 2.5.dp.toPx(), center = Offset(x, 2.dp.toPx()))
+                }
+                LegendSwatch.PrimaryMarker -> {
+                    val x = size.width / 2f
+                    drawLine(
+                        color = color,
+                        start = Offset(x, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = 1.2.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
+                    )
                 }
             }
         }
